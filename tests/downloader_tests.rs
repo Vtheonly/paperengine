@@ -1,4 +1,4 @@
-use paperengine::fetcher::stream::{DownloadError, DownloadConfig, ResumableDownloader};
+use paperengine::fetcher::stream::{DownloadConfig, DownloadError, ResumableDownloader};
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
@@ -33,9 +33,7 @@ impl ResponseFixture {
     }
 }
 
-fn start_server(
-    responses: Vec<ResponseFixture>,
-) -> (String, thread::JoinHandle<Vec<String>>) {
+fn start_server(responses: Vec<ResponseFixture>) -> (String, thread::JoinHandle<Vec<String>>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
 
@@ -49,9 +47,7 @@ fn start_server(
                 .unwrap();
             requests.push(read_request(&mut stream));
 
-            let length = response
-                .advertised_length
-                .unwrap_or(response.body.len());
+            let length = response.advertised_length.unwrap_or(response.body.len());
             let mut headers = format!(
                 "HTTP/1.1 {}\r\nContent-Length: {}\r\nConnection: close\r\n",
                 response.status, length
@@ -104,11 +100,9 @@ fn pdf_payload(size: usize) -> Vec<u8> {
 #[tokio::test]
 async fn public_api_downloads_and_hashes_a_complete_payload() {
     let payload = pdf_payload(2048);
-    let (url, server) = start_server(vec![
-        ResponseFixture::new("200 OK", payload.clone())
-            .header("Content-Type", "application/pdf")
-            .header("ETag", "\"v1\""),
-    ]);
+    let (url, server) = start_server(vec![ResponseFixture::new("200 OK", payload.clone())
+        .header("Content-Type", "application/pdf")
+        .header("ETag", "\"v1\"")]);
     let directory = tempfile::tempdir().unwrap();
     let destination = directory.path().join("paper.pdf");
 
@@ -122,11 +116,11 @@ async fn public_api_downloads_and_hashes_a_complete_payload() {
     assert_eq!(std::fs::read(&destination).unwrap(), payload);
     assert_eq!(result.bytes, payload.len() as u64);
     assert_eq!(result.resumed_from, 0);
-    assert_eq!(result.blake3_hex, blake3::hash(&payload).to_hex().to_string());
     assert_eq!(
-        result.sha256_hex,
-        format!("{:x}", Sha256::digest(&payload))
+        result.blake3_hex,
+        blake3::hash(&payload).to_hex().to_string()
     );
+    assert_eq!(result.sha256_hex, format!("{:x}", Sha256::digest(&payload)));
 }
 
 #[tokio::test]
@@ -140,7 +134,14 @@ async fn public_api_resumes_only_with_matching_range_and_validator() {
             .advertised_length(payload.len()),
         ResponseFixture::new("206 Partial Content", payload[split..].to_vec())
             .header("Content-Type", "application/pdf")
-            .header("Content-Range", format!("bytes {split}-{}/{total}", payload.len() - 1, total = payload.len()))
+            .header(
+                "Content-Range",
+                format!(
+                    "bytes {split}-{}/{total}",
+                    payload.len() - 1,
+                    total = payload.len()
+                ),
+            )
             .header("ETag", "\"stable-v1\""),
     ]);
     let directory = tempfile::tempdir().unwrap();
@@ -148,15 +149,14 @@ async fn public_api_resumes_only_with_matching_range_and_validator() {
     let downloader = ResumableDownloader::new(DownloadConfig::default()).unwrap();
 
     assert!(downloader.download(&url, &destination).await.is_err());
-    let result = downloader
-        .download(&url, &destination)
-        .await
-        .unwrap();
+    let result = downloader.download(&url, &destination).await.unwrap();
     let requests = server.join().unwrap();
 
     assert_eq!(std::fs::read(&destination).unwrap(), payload);
     assert_eq!(result.resumed_from, split as u64);
-    assert!(requests[1].to_ascii_lowercase().contains("range: bytes=1500-"));
+    assert!(requests[1]
+        .to_ascii_lowercase()
+        .contains("range: bytes=1500-"));
     assert!(requests[1].contains("If-Range: \"stable-v1\""));
     assert_eq!(
         result.blake3_hex,
@@ -174,7 +174,7 @@ async fn public_api_resumes_only_with_matching_range_and_validator() {
 async fn public_api_rejects_html_and_removes_unpublishable_partial_files() {
     let html = b"<!DOCTYPE html><html><body>access restricted</body></html>".to_vec();
     let (url, server) = start_server(vec![
-        ResponseFixture::new("200 OK", html).header("Content-Type", "text/html"),
+        ResponseFixture::new("200 OK", html).header("Content-Type", "text/html")
     ]);
     let directory = tempfile::tempdir().unwrap();
     let destination = directory.path().join("paper.pdf");
