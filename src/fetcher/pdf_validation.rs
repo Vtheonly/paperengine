@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -91,14 +91,31 @@ pub enum PdfValidationError {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PdfRejectionReason {
-    TooSmall { size_bytes: u64, minimum_bytes: u64 },
-    TooLarge { size_bytes: u64, maximum_bytes: u64 },
-    DeclaredMimeNotPdf { content_type: String },
-    MissingPdfSignature { prefix_hex: String },
+    TooSmall {
+        size_bytes: u64,
+        minimum_bytes: u64,
+    },
+    TooLarge {
+        size_bytes: u64,
+        maximum_bytes: u64,
+    },
+    DeclaredMimeNotPdf {
+        content_type: String,
+    },
+    MissingPdfSignature {
+        prefix_hex: String,
+    },
     MissingEofMarker,
-    ChecksumMismatch { algorithm: String },
-    FileChangedDuringHash { metadata_bytes: u64, hashed_bytes: u64 },
-    ParserRejected { detail: String },
+    ChecksumMismatch {
+        algorithm: String,
+    },
+    FileChangedDuringHash {
+        metadata_bytes: u64,
+        hashed_bytes: u64,
+    },
+    ParserRejected {
+        detail: String,
+    },
     ParserPanicked,
     EncryptedDocument,
     MissingCatalog,
@@ -349,7 +366,9 @@ fn hash_file(path: &Path) -> Result<FileChecksums, PdfValidationError> {
 
 fn read_prefix(path: &Path, limit: usize) -> Result<Vec<u8>, PdfValidationError> {
     let mut buffer = Vec::with_capacity(limit);
-    File::open(path)?.take(limit as u64).read_to_end(&mut buffer)?;
+    File::open(path)?
+        .take(limit as u64)
+        .read_to_end(&mut buffer)?;
     Ok(buffer)
 }
 
@@ -363,7 +382,10 @@ fn read_tail(path: &Path, size: u64, limit: usize) -> Result<Vec<u8>, PdfValidat
 }
 
 fn contains_window(haystack: &[u8], needle: &[u8]) -> bool {
-    !needle.is_empty() && haystack.windows(needle.len()).any(|window| window == needle)
+    !needle.is_empty()
+        && haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
 }
 
 fn unsupported_mime(content_type: Option<&str>) -> Option<String> {
@@ -593,7 +615,11 @@ mod tests {
         }
     }
 
-    fn validate(path: &Path, quarantine: &Path, context: PdfValidationContext) -> PdfValidationOutcome {
+    fn validate(
+        path: &Path,
+        quarantine: &Path,
+        context: PdfValidationContext,
+    ) -> PdfValidationOutcome {
         validate_or_quarantine_pdf(path, quarantine, context, test_config()).unwrap()
     }
 
@@ -621,7 +647,10 @@ mod tests {
                 assert_eq!(report.byte_length, bytes.len() as u64);
                 assert_eq!(report.blake3_hex, blake3::hash(&bytes).to_hex().to_string());
                 assert_eq!(report.sha256_hex, format!("{:x}", Sha256::digest(&bytes)));
-                assert_eq!(report.declared_content_type.as_deref(), Some("application/pdf"));
+                assert_eq!(
+                    report.declared_content_type.as_deref(),
+                    Some("application/pdf")
+                );
             }
             PdfValidationOutcome::Quarantined(other) => {
                 panic!("valid PDF quarantined: {:?}", other.manifest.reason)
@@ -755,7 +784,10 @@ mod tests {
             PdfValidationOutcome::Quarantined(item) => item,
             PdfValidationOutcome::Valid(_) => panic!("truncated PDF unexpectedly accepted"),
         };
-        assert_eq!(quarantined.manifest.reason, PdfRejectionReason::MissingEofMarker);
+        assert_eq!(
+            quarantined.manifest.reason,
+            PdfRejectionReason::MissingEofMarker
+        );
     }
 
     #[test]

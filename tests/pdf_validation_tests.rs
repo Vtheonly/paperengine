@@ -1,7 +1,7 @@
 //! Public acceptance tests for PDF validation and quarantine.
 
 use lopdf::dictionary;
-use lopdf::{Document, Dictionary, Object, Stream};
+use lopdf::{Dictionary, Document, Object, Stream};
 use paperengine::fetcher::pdf_validation::{
     validate_or_quarantine_pdf, PdfRejectionReason, PdfValidationConfig, PdfValidationContext,
     PdfValidationOutcome,
@@ -14,10 +14,7 @@ use tempfile::tempdir;
 fn write_valid_pdf(path: &Path) {
     let mut document = Document::with_version("1.5");
     let pages_id = document.new_object_id();
-    let content_id = document.add_object(Stream::new(
-        Dictionary::new(),
-        b"q Q\n".repeat(512),
-    ));
+    let content_id = document.add_object(Stream::new(Dictionary::new(), b"q Q\n".repeat(512)));
     let page_id = document.add_object(dictionary! {
         "Type" => "Page",
         "Parent" => pages_id,
@@ -209,5 +206,8 @@ fn partial_fixture_without_eof_is_quarantined() {
         PdfValidationOutcome::Quarantined(item) => item,
         PdfValidationOutcome::Valid(_) => panic!("truncated PDF must be quarantined"),
     };
-    assert_eq!(quarantined.manifest.reason, PdfRejectionReason::MissingEofMarker);
+    assert_eq!(
+        quarantined.manifest.reason,
+        PdfRejectionReason::MissingEofMarker
+    );
 }
