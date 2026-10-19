@@ -690,3 +690,47 @@ truncation, corrupt-object retry, and content-address verification by the 7 test
 - Image-only (scanned) PDFs yield an honest `empty` status, not fabricated text.
 - The index is derived state; a schema-incompatible index requires `--rebuild`.
 - No collection management or saved-search views yet (#33 follow-up scope).
+## Final merged-tree verification (extraction + indexing + search slice) — 2026-10-19
+
+Head: `c5e3aaa` (rebased over the concurrent #6 job-ledger, #29 manifest-atomicity, and
+#13 OAI-PMH-merge commits; both feature lines preserved).
+
+```bash
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 221 passed, 0 failed, 29 ignored (live, opt-in)
+cargo build --release               # pass
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources -- --ignored --nocapture --test-threads=1 \
+                                     # 29 passed, 0 failed, 56.54s
+```
+
+Offline breakdown: 172 unit, 3 downloader, 1 architecture contract, 7 extraction,
+8 indexing, 6 storage-finalization, 5 PDF-validation, 13 source-pipeline,
+6 job-ledger integration tests.
+
+Live suite highlights (all on the final tree): 6 real Layer-3 PDF acquisitions —
+arXiv 447,412 B (`f2441d3d…`), DOAJ 1,457,506 B (`ccdda175…`), OpenAlex 703,571 B
+(`4f111c22…`), Unpaywall 703,571 B (byte-identical to OpenAlex), OSF 408,201 B
+(`5ca36851…`), Zenodo 86,360 B (`365ea2d4…`) — plus Europe PMC acquisition honestly
+BLOCKED (403 from this network) and OpenAlex search honestly BLOCKED (429 free-tier
+budget). OAI-PMH harvests verified for Zenodo, DOAJ (incl. deleted tombstones), PMC,
+and arXiv (1,300 records with resumption tokens).
+
+End-to-end CLI replay on the final tree (fresh library):
+
+```bash
+paperengine discover --source arxiv --query "attention is all you need" --max-records 3 --out discovery.jsonl
+paperengine acquire  --from discovery.jsonl --library /tmp/research-library --max-downloads 1
+paperengine lookup   --source unpaywall --doi 10.1371/journal.pone.0000219 > lookup.jsonl
+paperengine acquire  --from lookup.jsonl --library /tmp/research-library --max-downloads 1
+paperengine extract  --library /tmp/research-library     # extracted=2, text_bytes=102154
+paperengine index    --library /tmp/research-library     # added=2
+paperengine search   --library /tmp/research-library --query "Arabidopsis microRNAs"
+paperengine search   --library /tmp/research-library --query "stateless eager schema injection"
+paperengine index    --library /tmp/research-library     # re-run: skipped=2 (incremental)
+```
+
+Both payload hashes matched the earlier runs exactly (`f2441d3d…`, `4f111c22…`),
+reproducing acquisition byte-for-byte. The body-text-only query returned the arXiv
+paper as the sole hit — full-text search over extracted text verified end to end.
