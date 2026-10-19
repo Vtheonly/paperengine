@@ -15,16 +15,22 @@ Implemented now:
 - Bounded anytime steps that preserve the best decision found so far.
 - A 64-byte event envelope and bounded SPSC ring. The API enforces one producer and one consumer; the slots are initialized once and no heap allocations occur in enqueue/dequeue.
 - A bounded orchestrator that returns on backpressure and retains a pending event rather than silently dropping it or spinning.
+- A bounded HTTP(S) downloader with validator-guarded resumption, early PDF magic-byte rejection, incremental BLAKE3/SHA-256 digests, minimum/maximum size limits, and no-clobber publication after complete transfer.
+- Unit and public-API integration tests for interrupted transfers, valid and mismatched ranges, changed/ignored representations, HTML masquerading as PDF, checksum parity, timeouts, size bounds, and simulated disk-full errors.
 - A small `paperengine rank` CLI that reads normalized numeric candidate rows from standard input and emits JSON Lines decision events.
 - GitHub Actions formatting, Clippy, test, and release-build checks.
 - A bounded HTTP(S) downloader with byte and time budgets, ETag/Last-Modified-guarded resume, strict Range/Content-Range checks, safe restart on ignored or changed ranges, and no-clobber publication after a complete transfer.
 - Local HTTP fixture tests for interrupted/resumed bodies, 206 responses, ignored Range, changed objects, timeouts, size limits, and simulated ENOSPC.
 
-Still **not implemented**: source/provider adapters, URL safety and cached link validation, policy-aware orchestration and source-specific rate limits, durable queues/leases/retries, PDF validation and quarantine, content-addressed and multi-volume storage, background integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+Still **not implemented**: source/provider adapters, URL safety and cached link validation, policy-aware orchestration and source-specific rate limits, durable queues/leases/retries, full structural PDF validation and provenance-aware quarantine, content-addressed and multi-volume storage, background integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
 
 ## Resumable downloader
 
-The library exposes an outer HTTP adapter through `paperengine::fetcher::stream::ResumableDownloader`. It streams to a sibling `.part` file, records ETag/Last-Modified metadata, and reuses partial bytes only when a usable validator and a matching `Content-Range` make continuation safe. If a server ignores Range or returns a changed object, the existing partial is discarded rather than appended to. Body size, request time, and total elapsed time are bounded. The destination path is published only after the transfer reaches EOF and advertised lengths have been checked; an existing destination is not overwritten.
+The library exposes an outer HTTP adapter through `paperengine::fetcher::stream::ResumableDownloader`. It streams to a sibling `.part` file, records ETag/Last-Modified metadata, and reuses partial bytes only when a usable validator and a matching `Content-Range` make continuation safe. If a server ignores Range or returns a changed object, the existing partial is discarded rather than appended to. Body size, request time, and total elapsed time are bounded.
+
+The downloader checks for `%PDF-` within the first 1,024 representation bytes, including when that prefix crosses range or stream-chunk boundaries. It refuses to publish invalid-signature payloads and removes their partial artifacts. It computes BLAKE3 and SHA-256 incrementally; when resuming, the existing partial prefix is re-read in fixed 64-KiB chunks to rebuild hash state without loading the whole file into memory. The default minimum payload size is 1 KiB and the default maximum is 512 MiB. This signature gate is not a full PDF parser and does not validate encryption, page structure, truncation beyond HTTP length semantics, or embedded object integrity.
+
+The destination path is published only after the transfer reaches EOF and advertised lengths have been checked; an existing destination is not overwritten.
 
 Example:
 

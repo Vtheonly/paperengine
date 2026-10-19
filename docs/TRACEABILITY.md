@@ -15,7 +15,7 @@ This map links requirements to the existing issue backlog and the current implem
 | Metadata normalization, query planner, paper-only classifier | issues #8, #9, #10; kernel input normalization is only the primitive boundary |
 | URL canonicalization, validation, policy and TTL | issues #14 through #23; not yet complete |
 | Durable queue, leases, retries, backpressure scheduler | issues #24 through #26; current SPSC ring is volatile and is not a durable job queue |
-| Streaming fetch with validator-guarded resume | issue #27; `src/fetcher/stream.rs` and local HTTP/fault tests; CI verified on main commit `a6125ce` |
+| Streaming fetch with validator-guarded resume, PDF signature gate and incremental hashes | issue #27; `src/fetcher/stream.rs`, `tests/downloader_tests.rs`, and HTTP/fault regression tests |
 | PDF validation and quarantine | issue #28; not yet complete |
 | Content-addressed storage and atomic finalization | issue #29; not yet complete |
 | Multi-volume capacity, integrity scans and backups | issue #30; not yet complete |
