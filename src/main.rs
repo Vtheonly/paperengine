@@ -51,7 +51,10 @@ fn run_rank(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
         match arg.as_str() {
             "--year" => reference_year = args.next().ok_or("--year requires a value")?.parse()?,
             "--policy-version" => {
-                policy_version = args.next().ok_or("--policy-version requires a value")?.parse()?
+                policy_version = args
+                    .next()
+                    .ok_or("--policy-version requires a value")?
+                    .parse()?
             }
             _ => return Err(format!("unknown argument: {arg}").into()),
         }
@@ -62,7 +65,9 @@ fn run_rank(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     for (line_number, line) in stdin.lock().lines().enumerate() {
         let line = line?;
         let row = line.trim();
-        if row.is_empty() || row.starts_with('#') { continue; }
+        if row.is_empty() || row.starts_with('#') {
+            continue;
+        }
 
         let fields: Vec<&str> = row.split(',').map(str::trim).collect();
         if fields.len() != 7 {
@@ -107,7 +112,10 @@ fn run_rank(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     }
 
     if !found_final {
-        writeln!(out, "{{\"kind\":\"decision\",\"status\":\"no_eligible_candidate\"}}")?;
+        writeln!(
+            out,
+            "{{\"kind\":\"decision\",\"status\":\"no_eligible_candidate\"}}"
+        )?;
     }
     out.flush()?;
     Ok(())
