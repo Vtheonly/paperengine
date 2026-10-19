@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 #[repr(C, align(64))]
 pub struct CacheAlignedSequence {
-    pub value: AtomicU64,
+    value: AtomicU64,
     _padding: [u8; 56],
 }
 
@@ -49,8 +49,8 @@ const _: () = assert!(core::mem::align_of::<CacheAlignedSequence>() == 64);
 
 pub struct EngineRingBuffer<const N: usize> {
     slots: Box<[UnsafeCell<TaskEnvelope>]>,
-    pub producer_sequence: CacheAlignedSequence,
-    pub consumer_sequence: CacheAlignedSequence,
+    producer_sequence: CacheAlignedSequence,
+    consumer_sequence: CacheAlignedSequence,
 }
 
 // SAFETY: the only API that accesses slots is obtained through split(&mut self), which
