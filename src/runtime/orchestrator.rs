@@ -25,7 +25,9 @@ impl fmt::Display for RuntimeError {
 }
 impl std::error::Error for RuntimeError {}
 impl From<EngineError> for RuntimeError {
-    fn from(error: EngineError) -> Self { Self::Engine(error) }
+    fn from(error: EngineError) -> Self {
+        Self::Engine(error)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,8 +62,12 @@ impl OrchestratorCursor {
             final_sent: false,
         }
     }
-    pub const fn is_complete(&self) -> bool { self.final_sent }
-    pub const fn best(&self) -> Option<AcquisitionDecision> { self.engine_cursor.best() }
+    pub const fn is_complete(&self) -> bool {
+        self.final_sent
+    }
+    pub const fn best(&self) -> Option<AcquisitionDecision> {
+        self.engine_cursor.best()
+    }
 }
 
 /// One bounded event-loop turn. A full ring produces a resumable backpressure result instead
@@ -72,9 +78,13 @@ pub struct EngineOrchestrator {
 impl EngineOrchestrator {
     pub fn new(candidate_budget_per_turn: usize) -> Result<Self, RuntimeError> {
         if candidate_budget_per_turn == 0 {
-            return Err(RuntimeError::Engine(EngineError::CandidateBudgetMustBePositive));
+            return Err(RuntimeError::Engine(
+                EngineError::CandidateBudgetMustBePositive,
+            ));
         }
-        Ok(Self { candidate_budget_per_turn })
+        Ok(Self {
+            candidate_budget_per_turn,
+        })
     }
 
     pub fn run_turn<const N: usize>(
@@ -85,7 +95,9 @@ impl EngineOrchestrator {
         producer: &mut RingProducer<'_, N>,
     ) -> Result<RuntimeProgress, RuntimeError> {
         if cursor.total_candidates != frontier.len() {
-            return Err(RuntimeError::Engine(EngineError::CursorDoesNotMatchFrontier));
+            return Err(RuntimeError::Engine(
+                EngineError::CursorDoesNotMatchFrontier,
+            ));
         }
 
         if let Some(event) = cursor.pending {
@@ -147,8 +159,11 @@ impl EngineOrchestrator {
         decision: AcquisitionDecision,
         is_final: bool,
     ) -> Result<TaskEnvelope, RuntimeError> {
-        let node = frontier.get(decision.candidate_index)
-            .ok_or(RuntimeError::Engine(EngineError::CursorDoesNotMatchFrontier))?;
+        let node = frontier
+            .get(decision.candidate_index)
+            .ok_or(RuntimeError::Engine(
+                EngineError::CursorDoesNotMatchFrontier,
+            ))?;
         let candidate_index = u32::try_from(decision.candidate_index)
             .map_err(|_| RuntimeError::CandidateIndexTooLarge(decision.candidate_index))?;
         let action_type = match decision.action {
@@ -170,10 +185,7 @@ impl EngineOrchestrator {
         })
     }
 
-    fn progress(
-        cursor: &OrchestratorCursor,
-        backpressured: bool,
-    ) -> RuntimeProgress {
+    fn progress(cursor: &OrchestratorCursor, backpressured: bool) -> RuntimeProgress {
         RuntimeProgress {
             candidates_evaluated: cursor.engine_cursor.candidates_evaluated(),
             total_candidates: cursor.total_candidates,
@@ -197,13 +209,15 @@ mod tests {
 
     #[test]
     fn emits_final_decision_and_preserves_backpressure_without_spinning() {
-        let frontier: Vec<_> = (1..=12).map(|id| FrontierNodeHot {
-            paper_id: id,
-            citation_count: id as u32 * 20,
-            source_id: 2,
-            flags: FLAG_HAS_METADATA,
-            ..FrontierNodeHot::default()
-        }).collect();
+        let frontier: Vec<_> = (1..=12)
+            .map(|id| FrontierNodeHot {
+                paper_id: id,
+                citation_count: id as u32 * 20,
+                source_id: 2,
+                flags: FLAG_HAS_METADATA,
+                ..FrontierNodeHot::default()
+            })
+            .collect();
 
         let engine = make_engine();
         let mut cursor = OrchestratorCursor::new(&engine, &frontier);
@@ -213,14 +227,18 @@ mod tests {
         let mut observed_final = false;
 
         for _ in 0..20 {
-            let progress = loop_engine.run_turn(&engine, &frontier, &mut cursor, &mut producer).unwrap();
+            let progress = loop_engine
+                .run_turn(&engine, &frontier, &mut cursor, &mut producer)
+                .unwrap();
             while let Some(event) = consumer.try_dequeue() {
                 if event.flags & EVENT_FLAG_FINAL != 0 {
                     observed_final = true;
                     assert_eq!(event.paper_id, 12);
                 }
             }
-            if progress.completed { break; }
+            if progress.completed {
+                break;
+            }
         }
 
         assert!(cursor.is_complete());
@@ -230,8 +248,18 @@ mod tests {
     #[test]
     fn restricted_high_score_candidate_is_never_dispatched() {
         let frontier = [
-            FrontierNodeHot { paper_id: 1, citation_count: 1, flags: FLAG_HAS_METADATA, ..FrontierNodeHot::default() },
-            FrontierNodeHot { paper_id: 2, citation_count: u32::MAX, flags: FLAG_HAS_METADATA | FLAG_RESTRICTED_BY_SOURCE, ..FrontierNodeHot::default() },
+            FrontierNodeHot {
+                paper_id: 1,
+                citation_count: 1,
+                flags: FLAG_HAS_METADATA,
+                ..FrontierNodeHot::default()
+            },
+            FrontierNodeHot {
+                paper_id: 2,
+                citation_count: u32::MAX,
+                flags: FLAG_HAS_METADATA | FLAG_RESTRICTED_BY_SOURCE,
+                ..FrontierNodeHot::default()
+            },
         ];
         let engine = make_engine();
         let mut cursor = OrchestratorCursor::new(&engine, &frontier);
@@ -239,7 +267,13 @@ mod tests {
         let mut ring = EngineRingBuffer::<4>::new();
         let (mut producer, mut consumer) = ring.split();
         loop {
-            if loop_engine.run_turn(&engine, &frontier, &mut cursor, &mut producer).unwrap().completed { break; }
+            if loop_engine
+                .run_turn(&engine, &frontier, &mut cursor, &mut producer)
+                .unwrap()
+                .completed
+            {
+                break;
+            }
         }
         while let Some(event) = consumer.try_dequeue() {
             assert_eq!(event.paper_id, 1);
