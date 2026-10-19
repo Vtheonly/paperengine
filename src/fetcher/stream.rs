@@ -428,18 +428,21 @@ impl ResumableDownloader {
                 .open(&part_path)
                 .await?;
 
+            let integrity = TransferIntegrity {
+                source_url: &source_url,
+                signature_probe,
+                signature_verified,
+                more_ranges_expected: range.is_some_and(|value| value.end + 1 < value.total),
+                blake3_hasher: &mut blake3_hasher,
+                sha256_hasher: &mut sha256_hasher,
+            };
             let received = pump_response_body(
                 response,
                 &mut file,
                 offset,
                 self.config.max_bytes,
                 deadline,
-                &source_url,
-                signature_probe,
-                signature_verified,
-                range.is_some_and(|value| value.end + 1 < value.total),
-                &mut blake3_hasher,
-                &mut sha256_hasher,
+                integrity,
             )
             .await;
             let received = match received {
@@ -555,22 +558,34 @@ async fn prime_hashers_from_disk(
     Ok(())
 }
 
+struct TransferIntegrity<'a> {
+    source_url: &'a str,
+    signature_probe: Vec<u8>,
+    signature_verified: bool,
+    more_ranges_expected: bool,
+    blake3_hasher: &'a mut blake3::Hasher,
+    sha256_hasher: &'a mut Sha256,
+}
+
 async fn pump_response_body<W>(
     response: Response,
     output: &mut W,
     existing_bytes: u64,
     max_bytes: u64,
     deadline: Instant,
-    source_url: &str,
-    mut signature_probe: Vec<u8>,
-    mut signature_verified: bool,
-    more_ranges_expected: bool,
-    blake3_hasher: &mut blake3::Hasher,
-    sha256_hasher: &mut Sha256,
+    integrity: TransferIntegrity<'_>,
 ) -> Result<u64, DownloadError>
 where
     W: AsyncWrite + Unpin,
 {
+    let TransferIntegrity {
+        source_url,
+        mut signature_probe,
+        mut signature_verified,
+        more_ranges_expected,
+        blake3_hasher,
+        sha256_hasher,
+    } = integrity;
     let mut stream = response.bytes_stream();
     let mut received = 0_u64;
     // Data is held only until the PDF signature is validated; this remains bounded to the
@@ -1056,18 +1071,23 @@ mod tests {
             start_server(vec![WireResponse::new("200 OK", b"%PDF-disk-space-test")]);
         let response = Client::new().get(url).send().await.unwrap();
         let mut output = NoSpaceWriter;
+        let mut blake3_hasher = blake3::Hasher::new();
+        let mut sha256_hasher = Sha256::new();
+        let integrity = TransferIntegrity {
+            source_url: "http://localhost/paper.pdf",
+            signature_probe: Vec::new(),
+            signature_verified: false,
+            more_ranges_expected: false,
+            blake3_hasher: &mut blake3_hasher,
+            sha256_hasher: &mut sha256_hasher,
+        };
         let result = pump_response_body(
             response,
             &mut output,
             0,
             100,
             Instant::now() + Duration::from_secs(2),
-            "http://localhost/paper.pdf",
-            Vec::new(),
-            false,
-            false,
-            &mut blake3::Hasher::new(),
-            &mut Sha256::new(),
+            integrity,
         )
         .await;
         server.join().unwrap();
