@@ -157,7 +157,9 @@ async fn public_api_resumes_only_with_matching_range_and_validator() {
     assert!(requests[1]
         .to_ascii_lowercase()
         .contains("range: bytes=1500-"));
-    assert!(requests[1].contains("If-Range: \"stable-v1\""));
+    assert!(requests[1]
+        .to_ascii_lowercase()
+        .contains("if-range: \"stable-v1\""));
     assert_eq!(
         result.blake3_hex,
         blake3::hash(&std::fs::read(&destination).unwrap())
