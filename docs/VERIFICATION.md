@@ -137,3 +137,60 @@ here — it requires a real Colab runtime and remains outstanding live verificat
 - The acquisition pipeline is sequential (one download at a time) by design; parallel
   acquisition with per-source quotas is future work (#25).
 - No performance claims are made in this report; benchmarks are tracked by issue #36.
+
+---
+
+# Verification Report — 2026-10-19 (second run, after the #12 adapter wave)
+
+Environment: Linux x86-64 (Debian 13 trixie container, 2 vCPU), rustc 1.99.1
+(58cf8f9c3 2026-10-13), cargo 1.99.1. All commands below were executed as written.
+
+## Static verification (source commit 4d81f0e)
+
+```bash
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 144 passed, 0 failed, 22 ignored (live, opt-in)
+cargo build --release               # pass
+```
+
+CI on the exact commit: see the run list at
+https://github.com/Vtheonly/paperengine/actions?query=branch:main — the row for
+head `4d81f0e` must be green before this report is trusted.
+
+## Live suite (Layers 2 and 3) — 22 tests, single-threaded
+
+```bash
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources -- --ignored --nocapture --test-threads=1
+```
+
+Result: **22 passed, 0 failed** in ~30 s. Eight real PDFs were acquired through the
+production pipeline (one small OA document per source), each structurally parsed,
+content-addressed, and provenance-manifested:
+
+| Source | Work | Bytes | Pages | SHA-256 |
+|---|---|---|---|---|
+| arXiv | `2604.21816v1` | 447,412 | 21 | `f2441d3d…95a9bd94aeb` |
+| OpenAlex | W1997413633 (PLOS ONE `10.1371/journal.pone.0000219`) | 703,571 | 14 | `4f111c22…1edc22006` |
+| Unpaywall | `10.1371/journal.pone.0000219` | 703,571 | 14 | `4f111c22…1edc22006` |
+| DOAJ | JIS `10.48550/…` record `00457175…` | 1,457,506 | 16 | `ccdda175…669947fed` |
+| Zenodo | record `18289747` | 86,360 | 1 | `365ea2d4…32d5e1acb` |
+| OSF | MetaArXiv `pybrz_v1` | 408,201 | 13 | `5ca36851…0333e3c2de7` |
+
+Cross-checks recorded for the first time in this run:
+
+- OpenAlex and Unpaywall independently resolved the same PLOS ONE work to
+  **byte-identical payloads** (same sha256), cross-validating both adapters'
+  link resolution.
+- A well-formed but unregistered DOI (`10.1038/paperengine-probe-doi-not-registered`)
+  surfaced as `Ok(None)` — never an error, never an invented record
+  (`live_crossref_doi_lookup_reports_a_missing_doi_as_none`).
+- The acquisition helper now asserts that the provenance manifest's sha256 and
+  byte length agree with the acquisition report before any evidence line is printed.
+- Europe PMC and PubMed Central were verified again as metadata-only (no PDF
+  claim); OpenAlex search remained blocked by the shared free-tier budget (HTTP
+  429) and is recorded as BLOCKED, not as a failure.
+
+Full per-source details and last-live-result entries are maintained in
+`docs/SOURCE_COVERAGE.md`.

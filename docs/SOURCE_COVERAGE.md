@@ -20,10 +20,13 @@ Verification layers: **L1** = offline fixture test; **L2** = live endpoint smoke
 Live-test command (opt-in, bounded):
 
 ```bash
-PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture
-# Layer 3 (downloads exactly one small arXiv PDF):
-PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture
+PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture --test-threads=1
+# Layer 3 (downloads exactly one small OA PDF per acquisition test; 8 sources in 2026-10):
+PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture --test-threads=1
 ```
+
+`--test-threads=1` is deliberate: each test constructs its own adapter and pacer, so
+serialized execution is what actually honors each source's minimum interval.
 
 ## Implemented sources
 
@@ -31,8 +34,9 @@ PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sourc
 
 - **Endpoint:** `https://api.openalex.org/works` (REST, JSON; cursor pagination)
 - **Adapter:** `src/sources/openalex.rs` (contract version 1, adapter version 1)
-- **Status:** fixture-tested; DOI lookup live-verified 2026-10-19; search currently
-  **blocked** from this network by the shared free-tier budget (see below)
+- **Status:** fixture-tested; live-verified 2026-10-19 at L2 (DOI lookup) and L3
+  (acquisition); search currently **blocked** from this network by the shared
+  free-tier budget (see below)
 - **Access basis:** public REST API with a polite contact e-mail. Since 2026 OpenAlex
   shares one free daily budget per IP for key-less requests and offers free per-key
   budgets; the adapter supports an optional `openalex_api_key`.
@@ -48,15 +52,22 @@ PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sourc
   (`tests/fixtures/openalex_search.json`, `openalex_work.json` are real recorded
   responses; `openalex_search_synthetic.json` is a clearly-labeled schema-accurate
   fixture covering the `pdf_url` path the recorded responses leave `null`); live tests
-  `live_openalex_doi_lookup_resolves_a_work` and
-  `live_openalex_discovery_or_blocked_by_free_tier_budget` in `tests/live_sources.rs`.
+  `live_openalex_doi_lookup_resolves_a_work`,
+  `live_openalex_discovery_or_blocked_by_free_tier_budget`, and
+  `live_openalex_end_to_end_pdf_acquisition` in `tests/live_sources.rs`.
 - **Last live result (2026-10-19):** DOI lookup of `10.7717/peerj.4375` returned
-  W2741809807 ("The state of OA…"). Search returned HTTP 429 ("free daily budget shared
-  by everyone on your network's IP address… is used up") — recorded as BLOCKED, not as
-  failure; an API key lifts this limit and is a documented configuration option.
+  W2741809807 ("The state of OA…"). L3 acquisition of the same PLOS ONE work
+  `10.1371/journal.pone.0000219` (W1997413633, resolved via
+  `best_oa_location.pdf_url`) produced a 703,571-byte, 14-page PDF, SHA-256
+  `4f111c22feab76f1f8b5e33474a01933f97d67cfbf56d4fbd53e7721edc22006`, stored
+  content-addressed with manifest provenance. The payload is byte-identical to the
+  same work acquired through the Unpaywall adapter, cross-checking both resolvers.
+  Search returned HTTP 429 ("free daily budget shared by everyone on your network's
+  IP address… is used up") — recorded as BLOCKED, not as failure; an API key lifts
+  this limit and is a documented configuration option.
 - **Limitations / next step:** live search verification pending an API key or budget
-  reset; add `from_publication_date` filters and incremental ingestion (issue #11
-  remainder).
+  reset; `from_publication_date` filters and incremental cross-run ingestion belong to
+  the discovery workflow (issue #9), not the adapter.
 
 ### arXiv
 
@@ -82,8 +93,9 @@ PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sourc
   `https://arxiv.org/pdf/2604.21816v1` produced a 447,412-byte, 21-page PDF,
   SHA-256 `f2441d3de469aa1e7c04b7e2412361cdc0b429b7ac5fbfd05196a5909bd94aeb`,
   stored content-addressed and re-opened by the structural parser (lopdf).
-- **Limitations / next step:** no full-text search field selection (`ti:`, `abs:`),
-  no incremental sync; those remain issue #12 remainder.
+- **Limitations / next step:** full-text field selection (`ti:`, `abs:`) and
+  incremental sync are query-planner features tracked with issue #9; this adapter
+  exposes phrase search and pagination today.
 
 ### Crossref
 
@@ -99,21 +111,24 @@ PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sourc
 - **Full text:** no — Crossref does not provide openly accessible full text.
 - **Rate policy:** ≥1 s between requests (polite pool).
 - **Tests:** fixture tests in `src/sources/crossref.rs` (recorded work-list response);
-  live tests `live_crossref_discovery_returns_metadata_without_pdf_links` and
-  `live_crossref_doi_lookup_resolves_a_stable_doi` in `tests/live_sources.rs`.
+  live tests `live_crossref_discovery_returns_metadata_without_pdf_links`,
+  `live_crossref_doi_lookup_resolves_a_stable_doi`, and
+  `live_crossref_doi_lookup_reports_a_missing_doi_as_none` in `tests/live_sources.rs`.
 - **Last live result (2026-10-19):** discovery returned 3 records (first DOI
-  `10.1007/978-3-031-84300-6_13`); DOI lookup resolved
-  `10.1371/journal.pone.0000219`. Note: pre-1956 DOIs such as `10.1038/171737a`
+  `10.1007/978-3-031-84300-6_13`); DOI lookup resolved `10.1038/171737a0` to the
+  Watson & Crick 1953 record (Nature, 1953). A well-formed but unregistered DOI
+  (`10.1038/paperengine-probe-doi-not-registered`) surfaced as `Ok(None)` — never an
+  error and never an invented record. Note: pre-1956 DOIs such as `10.1038/171737a`
   return 404 from the Crossref REST API — the adapter correctly maps this to
   "no record".
-- **Limitations / next step:** no reference/citation expansion, no incremental
-  ingestion (issue #11 remainder).
+- **Limitations / next step:** reference/citation expansion and incremental cross-run
+  ingestion belong to the discovery workflow (issue #9), not the adapter.
 
 ### Unpaywall
 
 - **Endpoint:** `https://api.unpaywall.org/v2/{doi}?email=…` (REST, JSON)
 - **Adapter:** `src/sources/unpaywall.rs` (contract version 1, adapter version 1)
-- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
+- **Status:** fixture-tested and live-verified (L1+L2+L3) on 2026-10-19
 - **Access basis:** free public API; a contact e-mail is a hard requirement and its
   absence is a typed configuration error.
 - **Capabilities:** DOI lookup resolving the best open-access location.
@@ -125,14 +140,20 @@ PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sourc
 - **Rate policy:** ≥1 s between requests; documented free tier is generous
   (100k calls/day) and was never approached by these tests.
 - **Tests:** fixture tests in `src/sources/unpaywall.rs` (recorded response for
-  `10.1371/journal.pone.0000219`); live test
-  `live_unpaywall_resolves_an_oa_doi_with_a_direct_pdf` in `tests/live_sources.rs`.
+  `10.1371/journal.pone.0000219`); live tests
+  `live_unpaywall_resolves_an_oa_doi_with_a_direct_pdf` and
+  `live_unpaywall_end_to_end_pdf_acquisition` in `tests/live_sources.rs`.
 - **Last live result (2026-10-19):** lookup of `10.1371/journal.pone.0000219`
   returned `is_oa: true` with direct PDF
   `https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0000219&type=printable`
-  (cc-by).
-- **Limitations / next step:** no batch DOI resolution, no oa_locations enumeration
-  beyond the best location (issue #11 remainder).
+  (cc-by). The L3 acquisition of the same record produced a 703,571-byte, 14-page
+  PDF, SHA-256
+  `4f111c22feab76f1f8b5e33474a01933f97d67cfbf56d4fbd53e7721edc22006`, stored
+  content-addressed with manifest provenance, and byte-identical to the same work
+  acquired through the OpenAlex adapter.
+- **Limitations / next step:** batch DOI resolution and `oa_locations` enumeration
+  beyond the best location are deferred adapter enhancements recorded here (no
+  dedicated issue); incremental cross-run ingestion belongs to issue #9.
 
 ## Newly implemented and live-verified (issue #12, 2026-10-19)
 
