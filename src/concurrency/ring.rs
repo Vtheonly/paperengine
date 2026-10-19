@@ -14,7 +14,10 @@ pub struct CacheAlignedSequence {
 
 impl CacheAlignedSequence {
     pub const fn new(initial: u64) -> Self {
-        Self { value: AtomicU64::new(initial), _padding: [0; 56] }
+        Self {
+            value: AtomicU64::new(initial),
+            _padding: [0; 56],
+        }
     }
 }
 
@@ -64,7 +67,10 @@ unsafe impl<const N: usize> Sync for EngineRingBuffer<N> {}
 impl<const N: usize> EngineRingBuffer<N> {
     /// Allocates all cells up front. No heap allocation occurs in enqueue/dequeue.
     pub fn new() -> Self {
-        assert!(N >= 2 && N.is_power_of_two(), "capacity must be a power of two >= 2");
+        assert!(
+            N >= 2 && N.is_power_of_two(),
+            "capacity must be a power of two >= 2"
+        );
         let slots = (0..N)
             .map(|_| UnsafeCell::new(TaskEnvelope::default()))
             .collect::<Vec<_>>()
@@ -76,20 +82,30 @@ impl<const N: usize> EngineRingBuffer<N> {
         }
     }
 
-    pub const fn capacity(&self) -> usize { N }
+    pub const fn capacity(&self) -> usize {
+        N
+    }
 
     /// Enforces one producer and one consumer by borrowing the ring mutably.
     pub fn split(&mut self) -> (RingProducer<'_, N>, RingConsumer<'_, N>) {
         let ring: &EngineRingBuffer<N> = self;
         (
-            RingProducer { ring, next_sequence: 0 },
-            RingConsumer { ring, next_sequence: 0 },
+            RingProducer {
+                ring,
+                next_sequence: 0,
+            },
+            RingConsumer {
+                ring,
+                next_sequence: 0,
+            },
         )
     }
 }
 
 impl<const N: usize> Default for EngineRingBuffer<N> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct RingProducer<'a, const N: usize> {
@@ -109,9 +125,14 @@ impl<const N: usize> RingProducer<'_, N> {
 
         let index = (self.next_sequence as usize) & (N - 1);
         // SAFETY: SPSC ownership plus the consumer sequence proves this slot is free.
-        unsafe { *self.ring.slots[index].get() = event; }
+        unsafe {
+            *self.ring.slots[index].get() = event;
+        }
         self.next_sequence = self.next_sequence.wrapping_add(1);
-        self.ring.producer_sequence.value.store(self.next_sequence, Ordering::Release);
+        self.ring
+            .producer_sequence
+            .value
+            .store(self.next_sequence, Ordering::Release);
         Ok(())
     }
 }
@@ -134,7 +155,10 @@ impl<const N: usize> RingConsumer<'_, N> {
         // owns the read side and the producer cannot reuse the slot until release below.
         let event = unsafe { *self.ring.slots[index].get() };
         self.next_sequence = self.next_sequence.wrapping_add(1);
-        self.ring.consumer_sequence.value.store(self.next_sequence, Ordering::Release);
+        self.ring
+            .consumer_sequence
+            .value
+            .store(self.next_sequence, Ordering::Release);
         Some(event)
     }
 }
@@ -144,7 +168,10 @@ mod tests {
     use super::*;
 
     fn event(id: u64) -> TaskEnvelope {
-        TaskEnvelope { paper_id: id, ..TaskEnvelope::default() }
+        TaskEnvelope {
+            paper_id: id,
+            ..TaskEnvelope::default()
+        }
     }
 
     #[test]
