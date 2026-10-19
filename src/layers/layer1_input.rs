@@ -1,7 +1,7 @@
 //! Normalize adapter-owned primitive values at the edge of the pure kernel.
 
-use core::fmt;
 use super::layer2_state::{FrontierNodeHot, KNOWN_FLAGS};
+use core::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CandidateInput {
@@ -25,8 +25,13 @@ impl fmt::Display for InputError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingPaperId => write!(f, "paper_id must be non-zero"),
-            Self::PublicationYearTooFarInFuture { year, reference_year } =>
-                write!(f, "year {year} exceeds reference year {reference_year} plus one"),
+            Self::PublicationYearTooFarInFuture {
+                year,
+                reference_year,
+            } => write!(
+                f,
+                "year {year} exceeds reference year {reference_year} plus one"
+            ),
             Self::UnknownFlags { bits } => write!(f, "unknown candidate flag bits: {bits:#x}"),
         }
     }
@@ -42,7 +47,9 @@ pub fn normalize_candidate(
     }
     let unknown_flags = input.flags & !KNOWN_FLAGS;
     if unknown_flags != 0 {
-        return Err(InputError::UnknownFlags { bits: unknown_flags });
+        return Err(InputError::UnknownFlags {
+            bits: unknown_flags,
+        });
     }
     if input.year != 0 && input.year > reference_year.saturating_add(1) {
         return Err(InputError::PublicationYearTooFarInFuture {
@@ -69,8 +76,13 @@ mod tests {
 
     fn sample() -> CandidateInput {
         CandidateInput {
-            paper_id: 9, citation_count: 10, venue_rank: 2, year: 2024,
-            estimated_size_kib: 32, source_id: 1, flags: FLAG_HAS_METADATA,
+            paper_id: 9,
+            citation_count: 10,
+            venue_rank: 2,
+            year: 2024,
+            estimated_size_kib: 32,
+            source_id: 1,
+            flags: FLAG_HAS_METADATA,
         }
     }
 
@@ -85,9 +97,15 @@ mod tests {
     fn rejects_zero_identity_and_unknown_bits() {
         let mut input = sample();
         input.paper_id = 0;
-        assert_eq!(normalize_candidate(input, 2026), Err(InputError::MissingPaperId));
+        assert_eq!(
+            normalize_candidate(input, 2026),
+            Err(InputError::MissingPaperId)
+        );
         input = sample();
         input.flags |= 1 << 31;
-        assert_eq!(normalize_candidate(input, 2026), Err(InputError::UnknownFlags { bits: 1 << 31 }));
+        assert_eq!(
+            normalize_candidate(input, 2026),
+            Err(InputError::UnknownFlags { bits: 1 << 31 })
+        );
     }
 }
