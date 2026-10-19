@@ -14,21 +14,30 @@ pub(crate) fn transition_batch(
 ) {
     let scores = score_candidates_batch(candidates, reference_year, prefer_simd);
     for (offset, node) in candidates.iter().take(SCORE_BATCH_SIZE).enumerate() {
-        if node.has_flag(FLAG_RESTRICTED_BY_SOURCE) { continue; }
+        if node.has_flag(FLAG_RESTRICTED_BY_SOURCE) {
+            continue;
+        }
         let next = AcquisitionDecision {
-            id: DecisionId { paper_id: node.paper_id, policy_version },
+            id: DecisionId {
+                paper_id: node.paper_id,
+                policy_version,
+            },
             candidate_index: first_index + offset,
             score: scores[offset],
             action: action_for_candidate(node),
         };
         let replace = match best {
             None => true,
-            Some(current) => next.score > current.score
-                || (next.score == current.score
-                    && (next.id.paper_id < current.id.paper_id
-                        || (next.id.paper_id == current.id.paper_id
-                            && next.candidate_index < current.candidate_index))),
+            Some(current) => {
+                next.score > current.score
+                    || (next.score == current.score
+                        && (next.id.paper_id < current.id.paper_id
+                            || (next.id.paper_id == current.id.paper_id
+                                && next.candidate_index < current.candidate_index)))
+            }
         };
-        if replace { *best = Some(next); }
+        if replace {
+            *best = Some(next);
+        }
     }
 }
