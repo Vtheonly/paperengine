@@ -17,7 +17,7 @@ pub const KNOWN_FLAGS: u32 = FLAG_HAS_METADATA
 
 /// Strings, URLs, provider payloads and provenance are intentionally kept in cold storage.
 #[repr(C, align(64))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrontierNodeHot {
     pub paper_id: u64,
     pub citation_count: u32,
@@ -28,6 +28,21 @@ pub struct FrontierNodeHot {
     pub source_id: u32,
     pub flags: u32,
     pub _reserved: [u8; 36],
+}
+
+impl Default for FrontierNodeHot {
+    fn default() -> Self {
+        Self {
+            paper_id: 0,
+            citation_count: 0,
+            venue_rank: 0,
+            year: 0,
+            estimated_size_kib: 0,
+            source_id: 0,
+            flags: 0,
+            _reserved: [0; 36],
+        }
+    }
 }
 
 impl FrontierNodeHot {
