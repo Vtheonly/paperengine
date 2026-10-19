@@ -1,0 +1,139 @@
+# Verification Report — 2026-10-19
+
+Environment: Linux x86-64, rustc 1.99.1 (5f94df478 2026-08-27), cargo 1.99.1, Ubuntu-class
+container, 2026-10-19 (UTC). All commands below were executed as written; nothing was
+simulated or mocked unless explicitly labeled.
+
+## Static verification (final source commit 82362f4)
+
+```bash
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 109 passed, 0 failed, 7 ignored (live, opt-in)
+cargo build --release               # pass
+```
+
+Test breakdown: 90 unit tests (lib), 3 downloader integration, 1 architecture contract,
+5 PDF validation integration, 10 source-pipeline integration, 7 ignored live tests.
+
+CI on the exact commit: run
+[39233243396](https://github.com/Vtheonly/paperengine/actions/runs/39233243396)
+conclusion **success** for `82362f4e4b349881118dd5b7176b621a8f86b33c`.
+
+## Live source smoke tests (Layer 2) — 2026-10-19
+
+Command:
+
+```bash
+PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture
+```
+
+Result: **7 passed, 0 failed** (including one reported BLOCKED, see OpenAlex below).
+
+| Test | Source | Observed result |
+|---|---|---|
+| `live_arxiv_discovery_returns_parseable_records_with_pdf_links` | arXiv | 3 records for phrase `"attention is all you need"`; first id `2604.21816v1`; every record carries an https PDF link and a publication year |
+| `live_arxiv_end_to_end_pdf_acquisition` | arXiv | see Layer 3 below |
+| `live_crossref_discovery_returns_metadata_without_pdf_links` | Crossref | 3 records, each with a normalized DOI, no OA PDF claims, landing page recorded |
+| `live_crossref_doi_lookup_resolves_a_stable_doi` | Crossref | `10.1371/journal.pone.0000219` resolved to "High-Throughput Sequencing of Arabidopsis microRNAs…" |
+| `live_unpaywall_resolves_an_oa_doi_with_a_direct_pdf` | Unpaywall | `is_oa: true`; direct PDF `https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0000219&type=printable` (cc-by) |
+| `live_openalex_doi_lookup_resolves_a_work` | OpenAlex | `10.7717/peerj.4375` → W2741809807 "The state of OA…" |
+| `live_openalex_discovery_or_blocked_by_free_tier_budget` | OpenAlex | HTTP 429: free-tier daily budget shared per IP exhausted; recorded as **BLOCKED** (source availability, not a code failure); optional API key is the documented remedy |
+
+## Real end-to-end PDF acquisition (Layer 3) — 2026-10-19
+
+### Via the live test (production pipeline, temp library)
+
+```bash
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources live_arxiv_end_to_end_pdf_acquisition -- --ignored --nocapture
+```
+
+Evidence line emitted by the test:
+
+```text
+ARXIV ACQUISITION EVIDENCE: id=2604.21816v1 url=https://arxiv.org/pdf/2604.21816v1
+bytes=447412 sha256=f2441d3de469aa1e7c04b7e2412361cdc0b429b7ac5fbfd05196a5909bd94aeb
+pages=21 object=…/library/objects/f2/f2441d3de469aa1e7c04b7e2412361cdc0b429b7ac5fbfd05196a5909bd94aeb.pdf
+```
+
+The finalized object was re-opened by the structural parser (lopdf) and the provenance
+manifest was verified to identify source, work id, retrieval time, and both checksums.
+
+### Via the documented CLI workflow
+
+```bash
+paperengine discover --source arxiv --query "attention is all you need" \
+  --max-records 5 --email <contact> --out discovery.jsonl
+paperengine acquire --from discovery.jsonl --library ./research-library --max-downloads 2
+paperengine inspect --library ./research-library
+```
+
+Observed (full JSONL in `reports/`, excerpted):
+
+| Work | URL | Bytes | SHA-256 | Pages | Outcome |
+|---|---|---|---|---|---|
+| arXiv `2604.21816v1` "Tool Attention Is All You Need…" | `https://arxiv.org/pdf/2604.21816v1` | 447,412 | `f2441d3de469…bd94aeb` | 21 | acquired |
+| arXiv `1706.03762v7` "Attention Is All You Need" | `https://arxiv.org/pdf/1706.03762v7` | 2,215,244 | `bdfaa68d8984…2df697` | 15 | acquired |
+| arXiv `2104.04692v3`, `2501.05730v1`, `2510.19861v1` | — | — | — | — | skipped: run budget exhausted (2-download cap) |
+
+Independent check performed outside the engine:
+
+```bash
+sha256sum research-library/objects/bd/bdfaa68d…pdf
+# bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697  (matches)
+```
+
+Both objects are content-addressed under `objects/<sha256[0..2]>/<sha256>.pdf`, carry
+provenance manifests under `manifests/`, and the run report is preserved under `reports/`.
+
+## Negative-path verification (offline, fixture-driven)
+
+Covered by `tests/source_pipeline_tests.rs` and `tests/pdf_validation_tests.rs`:
+
+- HTML masquerading as PDF is rejected by the downloader's signature gate; no partial
+  files survive; the run records a typed failure and never finalizes an object.
+- Truncated PDFs (missing `%%EOF`), corrupt object graphs, encrypted documents, checksum
+  mismatches, and changed-during-hash files are quarantined with typed reasons and
+  redacted provenance manifests.
+- `http://` URLs are policy-rejected unless explicitly allowed; URLs with embedded
+  credentials are always rejected; URLs without a host are rejected.
+- Download and byte budgets bound the run; records beyond the budget are reported as
+  skipped with an explicit reason, and exactly the permitted number of transfers hit the
+  wire (asserted against a request-counting fixture server).
+- Re-acquiring an identical object deduplicates to the existing content-addressed file
+  and does not create a second manifest.
+
+## Clean-checkout deployment verification (Colab-equivalent) — 2026-10-19
+
+`scripts/colab-equivalent-run.sh` replays the Colab notebook's shell cells (toolchain
+setup → clone at pinned revision `82362f4e4b349881118dd5b7176b621a8f86b33c` → release
+build → fmt/clippy/offline tests → configuration → live discovery → Unpaywall lookup →
+bounded real acquisition → library inspection) in a fresh temporary directory on a plain
+Linux box. Observed result: **SUCCESS**, reproducing the identical evidence values above:
+
+- discovery: 5 arXiv records for `"attention is all you need"`;
+- acquisition: `2604.21816v1` (447,412 bytes, 21 pages, SHA-256 `f2441d3d…bd94aeb`) and
+  `1706.03762v7` "Attention Is All You Need" (2,215,244 bytes, 15 pages, SHA-256
+  `bdfaa68d…2df697`) — byte-identical hashes to the earlier run, confirming
+  reproducibility;
+- 3 further records skipped by the 2-download budget with explicit reasons;
+- Unpaywall resolved `10.1371/journal.pone.0000219` to the PLOS ONE direct PDF.
+
+One earlier attempt of this script hit a transient arXiv connection timeout; the script
+now retries network-touching steps exactly once after a pause, which is documented in
+the script. The Colab-specific Google Drive mount (notebook cell 8) was **not** executed
+here — it requires a real Colab runtime and remains outstanding live verification.
+
+## Known limitations
+
+- OpenAlex search could not be live-verified from this network (shared free-tier budget
+  exhausted; HTTP 429). DOI lookup is live-verified; an API key is the documented
+  unblocking step.
+- Unpaywall-resolved PDF URLs were verified to resolve at the metadata level (L2);
+  a Layer-3 download through a Unpaywall-resolved link was not separately recorded in
+  this run — the acquisition path itself is source-agnostic and already exercised
+  end-to-end via arXiv.
+- The acquisition pipeline is sequential (one download at a time) by design; parallel
+  acquisition with per-source quotas is future work (#25).
+- No performance claims are made in this report; benchmarks are tracked by issue #36.

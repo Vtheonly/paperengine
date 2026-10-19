@@ -1,0 +1,45 @@
+name: Live source tests
+
+# Network-dependent live-source verification. Deliberately NOT part of the standard
+# CI that runs on every push: these tests contact real scholarly APIs (arXiv, Crossref,
+# Unpaywall, OpenAlex) within strict, tiny budgets, and one variant downloads exactly
+# one small open-access PDF through the production pipeline.
+#
+# Run manually from the Actions tab ("Run workflow"), or on a schedule if desired.
+
+on:
+  workflow_dispatch:
+    inputs:
+      acquire_real_pdf:
+        description: "Also download one real OA PDF (arXiv) through the pipeline"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  live-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PAPERENGINE_LIVE_TESTS: "1"
+      PAPERENGINE_LIVE_ACQUIRE: ${{ inputs.acquire_real_pdf && '1' || '0' }}
+      PAPERENGINE_CONTACT_EMAIL: "paperengine@users.noreply.github.com"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Offline checks stay green first
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --all-features
+      - name: Live source smoke tests (bounded)
+        run: cargo test --test live_sources -- --ignored --nocapture
+      - name: Upload acquisition evidence
+        if: env.PAPERENGINE_LIVE_ACQUIRE == '1'
+        run: |
+          echo "The live acquisition test prints an ARXIV ACQUISITION EVIDENCE line"
+          echo "with byte size, SHA-256, page count, and the storage path."

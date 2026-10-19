@@ -1,0 +1,28 @@
+# PaperEngine configuration example.
+# Copy to paperengine.toml and adjust. Every value below is the engine default.
+# Unknown keys are rejected; unsafe budgets fail validation with actionable errors.
+
+schema_version = 1
+
+# Contact address used for polite API pools (OpenAlex, Crossref) and required by
+# Unpaywall. Can also be provided with --email or PAPERENGINE_CONTACT_EMAIL.
+contact_email = "you@example.org"
+
+# Optional: OpenAlex free per-key budget (https://openalex.org/settings/api).
+# Without a key, key-less requests share one free daily budget per IP address.
+# openalex_api_key = "…"
+
+[discovery]
+default_page_size = 25   # records requested per page (1..=200)
+max_pages = 4            # pages fetched per discovery run (1..=100)
+max_records = 25         # records returned per discovery run (1..=10000)
+request_timeout_seconds = 30
+
+[acquisition]
+max_downloads = 5                     # payload downloads per run (1..=1000)
+max_bytes_per_file = 67108864         # 64 MiB per payload (1 KiB..=512 MiB)
+max_total_bytes = 268435456           # 256 MiB across the whole run
+request_timeout_seconds = 60
+total_timeout_seconds = 600
+inter_download_delay_seconds = 1      # polite pause between consecutive downloads
+allow_http = false                    # plain http:// PDF sources are refused by default

@@ -237,14 +237,16 @@ async fn live_crossref_doi_lookup_resolves_a_stable_doi() {
         ..CrossrefConfig::default()
     })
     .unwrap();
-    // A deliberately stable, famous record: Watson & Crick (1953).
+    // A stable, fully open-access PLOS ONE article that resolves in both Crossref and
+    // Unpaywall (verified live on 2026-10-19). Note: pre-1956 DOIs such as
+    // 10.1038/171737a are NOT indexed by the Crossref REST API and return 404.
     let record = adapter
-        .lookup_doi("10.1038/171737a")
+        .lookup_doi("10.1371/journal.pone.0000219")
         .await
         .expect("Crossref lookup should succeed")
         .expect("the DOI must resolve");
-    assert!(record.title.to_lowercase().contains("structure"));
-    assert_eq!(record.doi(), Some("10.1038/171737a"));
+    assert!(record.title.contains("High-Throughput Sequencing"));
+    assert_eq!(record.doi(), Some("10.1371/journal.pone.0000219"));
     eprintln!("Crossref DOI lookup OK: {}", record.title);
 }
 
