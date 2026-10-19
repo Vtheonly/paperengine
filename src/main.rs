@@ -5,10 +5,6 @@
 //! Real network adapters remain a separate roadmap slice and must enforce source policy again.
 
 use paperengine::concurrency::ring::{EngineRingBuffer, TaskEnvelope, EVENT_FLAG_FINAL};
-use paperengine::layers::layer2_state::{
-    FLAG_AUTHORIZED_FULL_TEXT, FLAG_HAS_CANDIDATE_URL, FLAG_HAS_METADATA,
-    FLAG_JATS_AVAILABLE, FLAG_PDF_SIGNATURE_VERIFIED, FLAG_RESTRICTED_BY_SOURCE,
-};
 use paperengine::runtime::orchestrator::{EngineOrchestrator, OrchestratorCursor};
 use paperengine::{normalize_candidate, AcquisitionEngine, CandidateInput, PolicyConfig};
 use std::error::Error;
