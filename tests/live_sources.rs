@@ -254,6 +254,35 @@ async fn live_crossref_doi_lookup_resolves_a_stable_doi() {
 
 #[tokio::test]
 #[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_crossref_doi_lookup_reports_a_missing_doi_as_none() {
+    if !live_tests_enabled() {
+        return;
+    }
+    let adapter = CrossrefAdapter::new(CrossrefConfig {
+        contact_email: Some(CONTACT_EMAIL.into()),
+        ..CrossrefConfig::default()
+    })
+    .unwrap();
+    // A well-formed but unregistered DOI must surface as Ok(None), never as an
+    // error and never as an invented record. The historically cited 171737a form
+    // (no trailing zero) is a real-world instance of this: it 404s through both
+    // Crossref and doi.org, which is exactly why it must not be test data above.
+    let lookup = adapter
+        .lookup_doi("10.1038/paperengine-probe-doi-not-registered")
+        .await;
+    match lookup {
+        Ok(None) => eprintln!("Crossref missing DOI correctly reported as Ok(None)"),
+        Ok(Some(record)) => {
+            panic!("unregistered DOI resolved unexpectedly: {}", record.title);
+        }
+        Err(error) => {
+            panic!("missing DOI must be Ok(None), not an error: {error}");
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
 async fn live_unpaywall_resolves_an_oa_doi_with_a_direct_pdf() {
     if !live_tests_enabled() {
         return;
@@ -415,6 +444,14 @@ async fn acquire_one_real_pdf(record: &paperengine::sources::WorkRecord, source_
     let manifests = library.list_manifests().unwrap();
     assert_eq!(manifests.len(), 1);
     assert_eq!(manifests[0].work.source_id, record.source_id);
+    assert_eq!(
+        manifests[0].content.sha256_hex, sha256_hex,
+        "manifest checksum must agree with the acquisition report"
+    );
+    assert_eq!(
+        manifests[0].content.byte_length, byte_length,
+        "manifest byte length must agree with the acquisition report"
+    );
     eprintln!(
         "{source_label} ACQUISITION EVIDENCE: id={} url={} bytes={} sha256={} pages={} object={}",
         record.source_record_id,
@@ -750,4 +787,48 @@ async fn live_osf_end_to_end_pdf_acquisition() {
         .find(|record| record.oa_pdf_url.is_some())
         .expect("the MetaArXiv preprint must expose a primary-file PDF");
     acquire_one_real_pdf(record, "OSF").await;
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_unpaywall_end_to_end_pdf_acquisition() {
+    if !live_tests_enabled() || !live_acquire_enabled() {
+        return;
+    }
+    let adapter = UnpaywallAdapter::new(UnpaywallConfig {
+        contact_email: Some(CONTACT_EMAIL.into()),
+        ..UnpaywallConfig::default()
+    })
+    .unwrap();
+    // PLOS ONE fully open-access article; verified live on 2026-10-19 that
+    // Unpaywall reports a direct url_for_pdf on journals.plos.org for it.
+    let record = adapter
+        .lookup_doi("10.1371/journal.pone.0000219")
+        .await
+        .expect("Unpaywall lookup should succeed")
+        .expect("the DOI must resolve");
+    acquire_one_real_pdf(&record, "UNPAYWALL").await;
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_openalex_end_to_end_pdf_acquisition() {
+    if !live_tests_enabled() || !live_acquire_enabled() {
+        return;
+    }
+    let adapter = OpenAlexAdapter::new(OpenAlexConfig {
+        contact_email: Some(CONTACT_EMAIL.into()),
+        ..OpenAlexConfig::default()
+    })
+    .unwrap();
+    // The same PLOS ONE article through OpenAlex; verified live on 2026-10-19 that
+    // best_oa_location.pdf_url is the direct PLOS PDF link for it. Resolving the
+    // same work through two independent sources must yield byte-identical payloads.
+    let record = adapter
+        .lookup_doi("10.1371/journal.pone.0000219")
+        .await
+        .expect("OpenAlex lookup should succeed")
+        .expect("the DOI must resolve");
+    assert_eq!(record.source_record_id, "W1997413633");
+    acquire_one_real_pdf(&record, "OPENALEX").await;
 }
