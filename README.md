@@ -1,104 +1,65 @@
 # PaperEngine
 
-A high-performance, fault-tolerant Rust engine for discovering scholarly papers, validating lawful full-text candidates, acquiring authorized files, and maintaining a durable, searchable local research library.
+PaperEngine is a Rust-first, local-first system for discovering scholarly work, prioritizing lawful full-text candidates, acquiring authorized files, and maintaining a durable, searchable research library.
 
-## Project status
+## Status
 
-**Planning/bootstrap stage.** This repository begins with requirements, architecture constraints, and a phased issue backlog. It is not yet an implemented downloader or search engine. Performance claims must be backed by repeatable benchmarks.
+The repository now has its first **computational kernel and bounded event-dispatch slice**. It is not yet a complete downloader or production research-library application. Do not mistake the in-memory demonstration path for an end-to-end acquisition pipeline.
 
-## Core principles
+Implemented now:
 
-- Rust-first, local-first, single-user by default.
-- Fast through bounded concurrency, streaming I/O, incremental work, caching, and avoiding redundant requests—not by bypassing source restrictions.
-- Durable jobs and resumable operations; recover cleanly after process or machine failure.
-- Separate scholarly works, manifestations/versions, source records, candidate URLs, stored objects, and provenance.
-- Preserve raw metadata and explain normalization or conflict decisions.
-- Prefer official APIs, repository exports, OAI-PMH, and explicitly permitted bulk datasets.
-- Respect source terms, documented quotas, rate limits, authentication requirements, and access controls. CAPTCHA, 403, 429, login restrictions, or prohibited automation are restriction signals—not challenges to bypass.
-- Discovery-only mode must never download payloads.
-- No unverified claims about source coverage, capacity, speed, or success rates.
+- A formal engine lifecycle contract and six-layer module boundaries.
+- A 64-byte, 64-byte-aligned candidate hot record with cold metadata kept outside it.
+- Deterministic integer scoring over the entire candidate frontier.
+- A fixed-size Structure-of-Arrays score batch, with runtime-gated AVX2 and a scalar fallback.
+- Bounded anytime steps that preserve the best decision found so far.
+- A 64-byte event envelope and bounded SPSC ring. The API enforces one producer and one consumer; the slots are initialized once and no heap allocations occur in enqueue/dequeue.
+- A bounded orchestrator that returns on backpressure and retains a pending event rather than silently dropping it or spinning.
+- A small `paperengine rank` CLI that reads normalized numeric candidate rows from standard input and emits JSON Lines decision events.
+- GitHub Actions formatting, Clippy, test, and release-build checks.
 
-## Architecture
+Still **not implemented**: source/provider adapters, URL safety and cached link validation, policy-aware network workers, durable queues/leases/retries, streaming/resumable downloads, PDF parsing and quarantine, content-addressed and multi-volume storage, background integrity scrubbing, JATS/TEI extraction, PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
 
-```mermaid
-flowchart TD
-  CLI[CLI and configuration] --> Planner[Query planner]
-  Planner --> Registry[Versioned source registry]
-  Registry --> Adapters[Source adapters]
-  Adapters --> Normalize[Normalization and provenance]
-  Normalize --> DB[(Metadata database)]
-  Normalize --> Validate[Candidate URL validation]
-  Validate --> Queue[Durable job queue]
-  Queue --> Scheduler[Policy-aware scheduler]
-  Scheduler --> Fetch[Streaming/resumable fetcher]
-  Fetch --> Verify[Payload validation and quarantine]
-  Verify --> Store[Content-addressed storage]
-  Store --> Extract[Text and metadata extraction]
-  Extract --> Index[Incremental search index]
-  DB --> Search[Local search]
-  Index --> Search
-  Search --> CLI
+## Architecture boundary
+
+The computational core consumes a pre-normalized in-memory frontier and emits a **recommendation event**. It does not open sockets, read or write files, access a database, consult a clock, or manufacture paper URLs. An outer worker must resolve the actual manifestation and candidate URL, enforce the source's current policy, and re-check authorization immediately before making each request.
+
+A restriction flag is a defense-in-depth signal, not an authorization system. HTTP 403/429, CAPTCHA, login, quotas, or explicit source restrictions must be recorded and handled through documented authorized routes, never bypassed.
+
+The formal lifecycle is documented in [Engine Core Architecture](docs/ENGINE_CORE_ARCHITECTURE.md), and the domain-specific decision is captured in [ADR 0001](docs/adr/0001-pure-computational-kernel.md).
+
+## CLI input format
+
+The current `rank` command consumes one candidate per line:
+
+```text
+paper_id,citation_count,venue_rank,year,estimated_size_kib,source_id,flags
 ```
 
-## Initial module boundaries
+All fields are numeric. The flags value can be decimal or hexadecimal. Empty lines and lines beginning with `#` are ignored.
 
-- `config`: typed configuration, validation, resource budgets, secret redaction.
-- `domain`: work, manifestation, source, candidate, object, job, provenance types.
-- `planner`: query decomposition, source priorities, budgets, dry-run plans.
-- `sources`: versioned plugin contract and source adapters.
-- `discovery`: metadata ingestion, pagination, identifier expansion, paper classification.
-- `validation`: URL safety, bounded redirects, cached link-health checks, MIME/status classification.
-- `queue`: durable state machine, leases, heartbeats, retries, crash recovery.
-- `scheduler`: per-source quotas, backpressure, fairness, circuit breakers.
-- `fetch`: streaming downloads, range resume where supported, checksums and size limits.
-- `storage`: content-addressed objects, atomic finalization, volume watermarks, backups.
-- `extract`: PDF/XML/text validation and provenance-aware extraction.
-- `index`: incremental metadata and full-text indexing.
-- `cli`: search, collection management, progress, dry-run, diagnostics, health checks.
-- `observability`: structured logs, metrics, benchmark and diagnostic output.
+Example:
 
-Keep boundaries narrow and avoid duplicated business logic. Prefer one canonical implementation per behavior.
+```bash
+printf '101,42,10,2024,512,1,1\n102,180,14,2025,256,2,7\n' \
+  | cargo run --release -- rank --year 2026 --policy-version 1
+```
 
-## Reliability model
+Decision events are emitted as JSON Lines. Intermediate improvements may be followed by a final event for the selected candidate. These are policy decisions only; no network operation happens in this command.
 
-Jobs use explicit persisted states, bounded retries, typed error categories, timestamps, and recovery rules. A retry is not a bypass. Authentication restrictions, CAPTCHAs, prohibited automation, and policy blocks must be recorded and routed to a documented authorized alternative or terminal state.
+## Verification
 
-Downloads stream to temporary files, enforce resource limits, verify expected size/checksum where available, validate payload type, and atomically finalize into content-addressed storage. Invalid or suspicious payloads are quarantined instead of being silently indexed.
-
-## Performance requirements
-
-- Measure throughput, latency, memory, disk amplification, DB write cost, cache hit rate, retry rate, and recovery time.
-- Establish a representative permitted corpus and benchmark environment before setting targets.
-- Use bounded parallelism and per-source rate policies; global concurrency must never override source limits.
-- Avoid unbounded buffering; stream large responses and extraction inputs.
-- Deduplicate before network work and use conditional revalidation when supported.
-- Keep performance regression budgets reproducible; do not optimize by weakening correctness or policy enforcement.
-
-## Phased roadmap
-
-- **P0 — Foundation:** freeze scope, capacity model, architecture decisions, validated config, data model, durable state machine.
-- **P1 — Discovery:** plugin contract, normalization, query planner, paper-only rules, official metadata/repository adapters.
-- **P2 — Validation and policy:** URL canonicalization, tiered link checks, restriction handling, cache TTL.
-- **P3 — Scheduling:** durable queue, leases, retries, backpressure and adaptive scheduling.
-- **P4 — Acquisition and storage:** streaming/resumable downloads, PDF validation, content-addressed storage, multi-volume safety.
-- **P5 — Library experience:** extraction, indexing, CLI search and collection workflows.
-- **P6 — Hardening:** diagnostics, fault injection, load tests and benchmark gates.
-- **P7 — Optional extensions:** reviewed bulk-ingestion paths, external-storage workflows, multi-worker coordination and read-only HTTP search.
-
-## Build and verification
-
-The implementation is expected to use stable Rust, automated formatting, linting, unit/integration tests, fault-injection tests, and reproducible benchmarks. Once the Rust workspace exists, the baseline checks should include:
+With stable Rust installed:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
+cargo build --release
 ```
 
-These commands are roadmap expectations until the workspace is implemented; they are not currently passing project checks.
+GitHub Actions runs these checks on pushes to `main` and pull requests. This editing environment does not have `cargo` or `rustc` installed, so local compilation has not been performed. Check the live CI run before calling this slice verified.
 
-## Issue workflow
+## Repository workflow
 
-Work in small, reviewable slices. Resolve P0 design and scope questions before implementing later phases. Do not attempt to solve the entire backlog in one change. Each issue should define tests, acceptance criteria, failure behavior, and documentation updates. Keep the default branch `main`; avoid parallel feature branches unless explicitly requested.
-
-See [Requirements](docs/REQUIREMENTS.md), [Traceability](docs/TRACEABILITY.md), and the GitHub Issues backlog.
+Read [Requirements](docs/REQUIREMENTS.md), [Traceability](docs/TRACEABILITY.md), and the relevant ADRs before implementation. Keep work on `main` by default, change one issue-sized slice at a time, and do not close an issue until its acceptance criteria and relevant failure paths have been verified. Never claim speed, scale, source coverage, or production readiness without reproducible evidence.
