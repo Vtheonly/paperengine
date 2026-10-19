@@ -67,8 +67,8 @@ pub fn score_candidates_batch(
         return scores;
     }
 
-    for i in 0..count {
-        scores[i] = citations[i] * CITATION_WEIGHT
+    for (i, score) in scores.iter_mut().enumerate().take(count) {
+        *score = citations[i] * CITATION_WEIGHT
             + venues[i] * VENUE_WEIGHT
             + years[i]
             - (sizes[i] >> 2)
