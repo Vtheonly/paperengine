@@ -1,5 +1,5 @@
 //! PaperEngine's pure in-memory acquisition-policy kernel.
- //! All networking, filesystem access, clocks, and persistence belong in outer adapters.
+//! All networking, filesystem access, clocks, and persistence belong in outer adapters.
 
 pub mod concurrency;
 pub mod engine_architecture;

@@ -101,7 +101,11 @@ impl ResumeMetadata {
     }
 
     fn matches_response(&self, headers: &HeaderMap) -> bool {
-        if let Some(etag) = self.etag.as_deref().filter(|tag| !tag.trim_start().starts_with("W/")) {
+        if let Some(etag) = self
+            .etag
+            .as_deref()
+            .filter(|tag| !tag.trim_start().starts_with("W/"))
+        {
             return header_text(headers, "etag").as_deref() == Some(etag);
         }
         match self.last_modified.as_deref() {
@@ -207,9 +211,8 @@ impl ResumableDownloader {
             Err(error) => return Err(error.into()),
         };
 
-        let resume_metadata = loaded_metadata.filter(|metadata| {
-            metadata.source_url == source_url && metadata.validator().is_some()
-        });
+        let resume_metadata = loaded_metadata
+            .filter(|metadata| metadata.source_url == source_url && metadata.validator().is_some());
         let mut offset = match (part_length, resume_metadata.as_ref()) {
             (Some(length), Some(_)) if length > 0 => length,
             _ => 0,
@@ -333,7 +336,9 @@ impl ResumableDownloader {
                 None
             };
 
-            let total_length = range.map(|value| value.total).or_else(|| response.content_length());
+            let total_length = range
+                .map(|value| value.total)
+                .or_else(|| response.content_length());
             if let Some(total) = total_length {
                 if total > self.config.max_bytes {
                     reset_partial(&part_path, &metadata_path).await?;
@@ -375,14 +380,9 @@ impl ResumableDownloader {
                 .open(&part_path)
                 .await?;
 
-            let received = pump_response_body(
-                response,
-                &mut file,
-                offset,
-                self.config.max_bytes,
-                deadline,
-            )
-            .await;
+            let received =
+                pump_response_body(response, &mut file, offset, self.config.max_bytes, deadline)
+                    .await;
             let received = match received {
                 Ok(count) => count,
                 Err(error) => {
@@ -602,9 +602,7 @@ mod tests {
         }
     }
 
-    fn start_server(
-        responses: Vec<WireResponse>,
-    ) -> (String, thread::JoinHandle<Vec<String>>) {
+    fn start_server(responses: Vec<WireResponse>) -> (String, thread::JoinHandle<Vec<String>>) {
         let _sequence = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
@@ -621,9 +619,7 @@ mod tests {
                     thread::sleep(response.delay);
                 }
 
-                let length = response
-                    .declared_length
-                    .unwrap_or(response.body.len());
+                let length = response.declared_length.unwrap_or(response.body.len());
                 let mut head = format!(
                     "HTTP/1.1 {}\r\nContent-Length: {}\r\nConnection: close\r\n",
                     response.status, length
@@ -708,7 +704,9 @@ mod tests {
         assert_eq!(result.resumed_from, 5);
         assert_eq!(std::fs::read(destination).unwrap(), b"helloworld");
         assert!(requests[1].to_ascii_lowercase().contains("range: bytes=5-"));
-        assert!(requests[1].to_ascii_lowercase().contains("if-range: \"v1\""));
+        assert!(requests[1]
+            .to_ascii_lowercase()
+            .contains("if-range: \"v1\""));
     }
 
     #[tokio::test]
@@ -717,8 +715,7 @@ mod tests {
             WireResponse::new("200 OK", b"old!!")
                 .header("ETag", "\"v1\"")
                 .declared_length(10),
-            WireResponse::new("200 OK", b"replacement")
-                .header("ETag", "\"v2\""),
+            WireResponse::new("200 OK", b"replacement").header("ETag", "\"v2\""),
         ]);
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("paper.pdf");
@@ -740,8 +737,7 @@ mod tests {
             WireResponse::new("206 Partial Content", b"other")
                 .header("Content-Range", "bytes 5-9/10")
                 .header("ETag", "\"v2\""),
-            WireResponse::new("200 OK", b"new-object!")
-                .header("ETag", "\"v2\""),
+            WireResponse::new("200 OK", b"new-object!").header("ETag", "\"v2\""),
         ]);
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("paper.pdf");
@@ -757,8 +753,9 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_known_oversized_response_before_publishing_file() {
-        let (url, server) =
-            start_server(vec![WireResponse::new("200 OK", b"123456").header("ETag", "\"v1\"")]);
+        let (url, server) = start_server(vec![
+            WireResponse::new("200 OK", b"123456").header("ETag", "\"v1\"")
+        ]);
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("paper.pdf");
         let result = ResumableDownloader::new(test_config(5))
@@ -775,7 +772,7 @@ mod tests {
     #[tokio::test]
     async fn enforces_request_timeout() {
         let (url, server) = start_server(vec![
-            WireResponse::new("200 OK", b"late").delay(Duration::from_millis(350)),
+            WireResponse::new("200 OK", b"late").delay(Duration::from_millis(350))
         ]);
         let mut config = test_config(100);
         config.request_timeout = Duration::from_millis(100);
@@ -801,17 +798,11 @@ mod tests {
             Poll::Ready(Err(io::Error::from_raw_os_error(28)))
         }
 
-        fn poll_flush(
-            self: Pin<&mut Self>,
-            _context: &mut Context<'_>,
-        ) -> Poll<io::Result<()>> {
+        fn poll_flush(self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<io::Result<()>> {
             Poll::Ready(Ok(()))
         }
 
-        fn poll_shutdown(
-            self: Pin<&mut Self>,
-            _context: &mut Context<'_>,
-        ) -> Poll<io::Result<()>> {
+        fn poll_shutdown(self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<io::Result<()>> {
             Poll::Ready(Ok(()))
         }
     }
@@ -843,13 +834,17 @@ mod tests {
         let destination = dir.path().join("paper.pdf");
         let downloader = ResumableDownloader::new(test_config(100)).unwrap();
         assert!(matches!(
-            downloader.download("file:///etc/passwd", &destination).await,
+            downloader
+                .download("file:///etc/passwd", &destination)
+                .await,
             Err(DownloadError::Protocol(_))
         ));
 
         std::fs::write(&destination, b"already complete").unwrap();
         assert!(matches!(
-            downloader.download("http://127.0.0.1:1/paper.pdf", &destination).await,
+            downloader
+                .download("http://127.0.0.1:1/paper.pdf", &destination)
+                .await,
             Err(DownloadError::DestinationExists(_))
         ));
     }
