@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- FIXTURE (real PubMed Central OAI-PMH ListRecords response (https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/, from=2026-10-10), truncated to the first 3 records plus the real resumptionToken; recorded 2026-10-19). -->
+
+
+
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+    <responseDate>2026-10-19T10:53:02Z</responseDate>
+    <request verb="ListRecords" from="2026-10-10" metadataPrefix="oai_dc">https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/</request>
+    
+    
+    <ListRecords>
+<record>
+    <header>
+    <identifier>oai:pubmedcentral.nih.gov:6718227</identifier>
+    <datestamp>2020-09-02</datestamp>
+    
+        
+        <setSpec>cochrev</setSpec>
+        
+    
+</header>
+    <metadata>
+        
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd"><dc:title>Interventions to reduce tobacco use in people experiencing homelessness</dc:title><dc:creator>Vijayaraghavan, Maya</dc:creator><dc:creator>Elser, Holly</dc:creator><dc:creator>Apollonio, Dorie</dc:creator><dc:source>Cochrane Database Syst Rev</dc:source><dc:subject>Medicine General &amp; Introductory Medical Sciences</dc:subject><dc:description>This is a protocol for a Cochrane Review (Intervention). The objectives are as follows: To assess whether interventions designed to improve access to smoking cessation interventions for adults experiencing homelessness and interventions designed to help adults experiencing homelessness to quit smoking lead to increased engagement and tobacco abstinence. To also assess whether smoking cessation interventions for adults experiencing homelessness affect substance use and mental health.</dc:description><dc:publisher>John Wiley and Sons, Inc. and the Cochrane Library</dc:publisher><dc:date>2019-09-02</dc:date><dc:identifier>https://pmc.ncbi.nlm.nih.gov/articles/PMC6718227/</dc:identifier><dc:identifier>https://doi.org/10.1002/14651858.cd013413</dc:identifier><dc:type>Text</dc:type><dc:language>en</dc:language><dc:rights>Copyright &#169; 2019 The Cochrane Collaboration. Published by John Wiley &amp; Sons, Ltd.</dc:rights></oai_dc:dc>
+        
+    </metadata>
+</record>
+<record>
+    <header>
+    <identifier>oai:pubmedcentral.nih.gov:7619012</identifier>
+    <datestamp>2026-10-17</datestamp>
+    
+</header>
+    <metadata>
+        
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd"><dc:title>Chemoprevention of Hepatocellular Carcinoma by Next-Generation Antipsychotic Aripiprazole</dc:title><dc:creator>Slovi&#263;, Nevena</dc:creator><dc:creator>Mishra, Sumit</dc:creator><dc:creator>Paul, Subhojit</dc:creator><dc:creator>Oudot, Marine A.</dc:creator><dc:creator>J&#252;hling, Frank</dc:creator><dc:creator>Kanzaki, Hiroaki</dc:creator><dc:creator>Moehlin, Julien</dc:creator><dc:creator>Charlot, Anouk</dc:creator><dc:creator>Denos, Margaux</dc:creator><dc:creator>Durand, Sarah C</dc:creator><dc:creator>Katz, Courtney</dc:creator><dc:creator>Gadenne, Clo&#233;</dc:creator><dc:creator>Felli, Emanuele</dc:creator><dc:creator>Ono, Atsushi</dc:creator><dc:creator>Oka, Shiro</dc:creator><dc:creator>Higashi, Takaaki</dc:creator><dc:creator>Nakagawa, Shigeki</dc:creator><dc:creator>Akuta, Norio</dc:creator><dc:creator>Goossens, Nicolas</dc:creator><dc:creator>Chayama, Kazuaki</dc:creator><dc:creator>Lupberger, Joachim</dc:creator><dc:creator>Crouchet, Emilie</dc:creator><dc:creator>Hoshida, Yujin</dc:creator><dc:creator>Baumert, Thomas F.</dc:creator><dc:source>Hepatology</dc:source><dc:subject>Article</dc:subject><dc:description>Hepatocellular carcinoma (HCC) is the most common form of liver cancer and is a major global health burden, ranking sixth in incidence and third in cancer-related mortality. Despite therapeutic advances, treatment options for advanced liver disease and HCC are limited and strategies to prevent HCC development are lacking. To address the urgent need for preventive strategies, we identified aripiprazole, an oral atypical antipsychotic, as a candidate for HCC chemoprevention. Analyses of clinical liver tissues showed that aripiprazole targets are expressed in different liver cell compartments including fibroblasts, macrophages and epithelial cancer cells, and that target gene expression is associated with fibrotic liver diseases and HCC. In a rat model of MASH-induced HCC induced by choline-deficient L-amino acid-defined and high-fat diet, aripiprazole prevents liver disease progression and HCC development by modulating fibrogenesis related pathways and inflammation. Mechanistically, aripiprazole exerts antifibrogenic and anti-inflammatory effects by modulating the phenotype of liver fibroblasts and macrophages. Moreover, perturbation studies in cancer cell models showed that aripiprazole prevents tumor initiation and reduces cell proliferation via inhibition of the cMET and ERK pathways and perturbation of mitochondrial functions. Finally, treatment of patient-derived tumorspheroids demonstrated that aripiprazole modulates immune responses in the tumor microenvironment. Collectively, these findings suggest that treatment with aripiprazole is a clinically relevant approach for HCC chemoprevention.</dc:description><dc:date>2026-03-13</dc:date><dc:identifier>https://pmc.ncbi.nlm.nih.gov/articles/PMC7619012/</dc:identifier><dc:identifier>https://pubmed.ncbi.nlm.nih.gov/41838879/</dc:identifier><dc:identifier>https://doi.org/10.1097/HEP.0000000000001719</dc:identifier><dc:type>Text</dc:type><dc:language>en</dc:language></oai_dc:dc>
+        
+    </metadata>
+</record>
+<record>
+    <header>
+    <identifier>oai:pubmedcentral.nih.gov:7619042</identifier>
+    <datestamp>2026-10-17</datestamp>
+    
+        
+        <setSpec>pmc-open</setSpec>
+        
+    
+</header>
+    <metadata>
+        
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd"><dc:title>Prebiotic aqueous reactions catalyzed by native nickel without hydrogen</dc:title><dc:creator>Garcia Garcia, Carolina</dc:creator><dc:creator>Brabender, Max</dc:creator><dc:creator>Martin, William F.</dc:creator><dc:source>FEBS J</dc:source><dc:subject>Original Article</dc:subject><dc:description>Compared to iron, nickel is comparatively rare as a transition metal in enzymes. However, it is essential in several enzymes of carbon and energy metabolism in acetogens (bacteria) and methanogens (archaea), which use the acetyl&#8208;CoA pathway of H(2)&#8208;dependent CO(2) fixation. Nickel containing enzymes of acetogens and methanogens include FeNi hydrogenase, carbon monoxide dehydrogenase, acetyl&#8208;CoA synthase and, in methanogens, methyl&#8208;CoM reductase in the last step of methane synthesis. Several lines of evidence implicate the acetyl&#8208;CoA pathway as the most ancient pathway of CO(2) fixation, most notably recent findings that the overall reaction of the enzymatic pathway from H(2) (E (0)&#8242;&#8201;=&#8201;&#8722;414&#8201;mV) and CO(2) to pyruvate can be replaced by Ni(0) alone in water as the lone catalyst. Here, we studied Ni(0) as a catalyst and reductant for nonenzymatic redox reactions that require only a mild reductant, as the midpoint potential of Ni(0) oxidation to Ni(2+) is E (0)&#8242;&#8201;=&#8201;&#8722;260&#8201;mV. We showed that Ni(0) in water can convert 2&#8208;oxo acids to 2&#8208;hydroxy acids and, in the presence of NH(3), to amino acids at 25&#8211;100 &#176;C without the addition of H(2), and that it functions as a catalyst and reductant for the fumarate reductase reaction. The findings expand the repertoire of ancient metabolic reactions that Ni(0) can catalyze without proteins, cofactors, or sulfur, shedding light on the broad catalytic activity and substrate specificity of Ni(0) at metabolic origin.</dc:description><dc:date>2026-04-18</dc:date><dc:identifier>https://pmc.ncbi.nlm.nih.gov/articles/PMC7619042/</dc:identifier><dc:identifier>https://pubmed.ncbi.nlm.nih.gov/41999123/</dc:identifier><dc:identifier>https://doi.org/10.1111/febs.70556</dc:identifier><dc:type>Text</dc:type><dc:language>en</dc:language><dc:rights>&#169; 2026 The Author(s). The FEBS Journal published by John Wiley &amp; Sons Ltd on behalf of Federation of European Biochemical Societies. This is an open access article under the terms of the http://creativecommons.org/licenses/by/4.0/ License, which permits use, distribution and reproduction in any medium, provided the original work is properly cited.</dc:rights><dc:rights>https://creativecommons.org/licenses/by/4.0/</dc:rights></oai_dc:dc>
+        
+    </metadata>
+</record>
+<resumptionToken>Wzc2MTk1MjQsbnVsbCwiMjAyNi0xMC0xMCIsbnVsbCwib2FpX2RjIl0:kT1NUE-g7e7K0vag_MfJNp_smVxHv5SFLuuSK9LleHs</resumptionToken>
+    </ListRecords>
+</OAI-PMH>

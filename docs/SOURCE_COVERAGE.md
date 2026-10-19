@@ -296,11 +296,39 @@ entries have been retired; the recorded access mechanisms turned out accurate.
 - **Limitations / next step:** per-record file resolution is N+1 by API design
   (`include=primary_file` was tested and returns no compound documents).
 
-## Named in scope but not implemented
+## OAI-PMH repositories (family, #13)
 
-| Source | Canonical endpoint / mechanism | What it can provide | Next step |
-|---|---|---|---|
-| **OAI-PMH repositories (generic)** | `Identify`/`ListRecords`/`ListIdentifiers` with `resumptionToken` flow | Harvestable metadata (Dublin Core and friends); full text only when the repository exposes content URLs | Implement the generic harvester behind the versioned source contract (#13) |
+- **Endpoints:** one generic adapter class serves every repository that documents
+  OAI-PMH 2.0. Registered instances: `zenodo-oaipmh` (`https://zenodo.org/oai2d`),
+  `doaj-oaipmh` (`https://doaj.org/oai`), and `pmc-oaipmh`
+  (`https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/` — the modern location of the
+  legacy `ncbi.nlm.nih.gov/pmc/oai/oai.cgi`, which 301-redirects there).
+- **Adapter:** `src/sources/oaipmh.rs` (contract version 1, adapter version 1).
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19 for all
+  three instances.
+- **Access basis:** public OAI-PMH 2.0; `ListRecords` with `oai_dc`, `from`
+  date windows, and opaque `resumptionToken` continuation through the cursor.
+  >=1.5 s between requests.
+- **Capabilities:** metadata harvest only. `query.text` is parsed as the `from`
+  window when it is a valid ISO date; OAI-PMH has no search semantics. The
+  paper-only default excludes containers (`journal`) and non-paper objects
+  (`info:eu-repo/semantics/other`, datasets, software); `dc:type=Text`
+  (PubMed Central) is accepted as paper-like.
+- **Identifiers provided:** OAI identifier, DOI (from `dc:identifier`),
+  PMCID (from PMC article URLs).
+- **Full text:** **no direct PDF.** Dublin Core carries no reliable full-text
+  URLs and the adapter never claims one.
+- **Tests:** fixture tests in `src/sources/oaipmh.rs` (`zenodo_oai_records.xml`,
+  `doaj_oai_records.xml`, `doaj_oai_norecords.xml`, `pmc_oai_records.xml`,
+  recorded 2026-10-19); live tests `live_zenodo_oaipmh_*`,
+  `live_doaj_oaipmh_*`, `live_pmc_oaipmh_*` in `tests/live_sources.rs`.
+- **Last live result (2026-10-19):** Zenodo harvest of the 2026-10-19 window
+  returned 50 records (paper filter: 50 -> 18) with a resumption token; DOAJ
+  harvest from 2026-09-01 returned 274 journal records, all excluded by the
+  default paper-only policy; PMC harvest from 2026-10-10 returned 10 article
+  records with DOIs and PMCIDs. All three followed resumption tokens.
+- **Limitations / next step:** date-window harvesting only (no search);
+  incremental sync with persisted datestamp cursors is future work.
 
 ## What is deliberately not supported
 

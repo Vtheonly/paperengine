@@ -1,0 +1,103 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- FIXTURE (real Zenodo OAI-PMH ListRecords response (from=2026-10-19T10:00:00Z), truncated to the first 3 records plus the real resumptionToken; recorded 2026-10-19). -->
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="/static/oai2.xsl"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+  <responseDate>2026-10-19T10:51:14Z</responseDate>
+  <request verb="ListRecords" from="2026-10-19T10:00:00Z" until="2026-10-19T10:50:00Z" metadataPrefix="oai_dc">https://zenodo.org/oai2d</request>
+  <ListRecords>
+<record>
+      <header>
+        <identifier>oai:zenodo.org:23470914</identifier>
+        <datestamp>2026-10-19T10:00:11Z</datestamp>
+        <setSpec>openaire_data</setSpec>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd">
+          <dc:creator>Pinzón Pineda, Daniel Mauricio</dc:creator>
+          <dc:date>2026-10-18</dc:date>
+          <dc:description>&amp;lt;p&amp;gt;En Nueva Zelandia (localidad de Suba), Bogotá, la mediana de precio de venta de vivienda es COP 380 millones, según 49 avisos únicos vigentes. Eso la ubica 56 % por debajo de la mediana de Bogotá para vivienda (COP 865 millones). El área mediana anunciada es 57 m² (en Bogotá: 146 m²). Por metro cuadrado, la mediana es COP 7.250.000/m² (+11 % frente a COP 6.557.377/m² en Bogotá), puesto 81 de 280 barrios con muestra suficiente. Cruzando con la oferta de arriendo del mismo barrio, la rentabilidad bruta implícita es de 6,7 % anual (canon por m² × 12 / precio por m²). El rango intercuartílico va de COP 265 millones a COP 650 millones (razón 2,5), una dispersión alta. El segmento con más oferta es el de 3 habitaciones (17 avisos, mediana COP 570 millones); pasar de 2 habitaciones a 3 habitaciones sube la mediana 97 %.&amp;lt;/p&amp;gt;&amp;lt;p&amp;gt;Metodología: avisos residenciales vigentes al 18 de octubre de 2026 en portales inmobiliarios colombianos, deduplicados entre portales; precios de oferta en pesos colombianos (COP); solo se publican celdas con al menos 30 avisos únicos. Archivos: PDF de 2 páginas, CSV con las cifras y gráfica PNG. Licencia CC BY 4.0.&amp;lt;/p&amp;gt;&amp;lt;ul&amp;gt;&amp;lt;li&amp;gt;Fuente y búsqueda de inmuebles en Aptología: https://www.aptologia.com/venta/bogota/nueva-zelandia&amp;lt;/li&amp;gt;&amp;lt;li&amp;gt;Carpeta en GitHub: https://github.com/elbroker/aptologia-microestudios/tree/main/bogota/venta-nueva-zelandia-bogota-octubre-2026&amp;lt;/li&amp;gt;&amp;lt;li&amp;gt;Dataset del grupo en Hugging Face: https://huggingface.co/datasets/aptologia/microestudios-barrios-bogota-2026&amp;lt;/li&amp;gt;&amp;lt;li&amp;gt;Componente OSF del grupo: https://osf.io/w8qk7/&amp;lt;/li&amp;gt;&amp;lt;/ul&amp;gt;</dc:description>
+          <dc:description>Microestudio generado automáticamente por Aptología a partir de datos agregados; ver metodología en el PDF.</dc:description>
+          <dc:identifier>oai:zenodo.org:23470914</dc:identifier>
+          <dc:identifier>https://doi.org/10.5281/zenodo.23470914</dc:identifier>
+          <dc:language>spa</dc:language>
+          <dc:publisher>Zenodo</dc:publisher>
+          <dc:relation>https://www.aptologia.com/venta/bogota/nueva-zelandia</dc:relation>
+          <dc:relation>https://github.com/elbroker/aptologia-microestudios/tree/main/bogota/venta-nueva-zelandia-bogota-octubre-2026</dc:relation>
+          <dc:relation>https://huggingface.co/datasets/aptologia/microestudios-barrios-bogota-2026</dc:relation>
+          <dc:relation>https://osf.io/w8qk7/</dc:relation>
+          <dc:relation>https://doi.org/10.5281/zenodo.23470913</dc:relation>
+          <dc:rights>info:eu-repo/semantics/openAccess</dc:rights>
+          <dc:rights>Creative Commons Attribution 4.0 International</dc:rights>
+          <dc:rights>https://creativecommons.org/licenses/by/4.0/legalcode</dc:rights>
+          <dc:subject>venta Nueva Zelandia</dc:subject>
+          <dc:subject>Nueva Zelandia Bogotá</dc:subject>
+          <dc:subject>precio venta Bogotá</dc:subject>
+          <dc:subject>vivienda</dc:subject>
+          <dc:subject>precio por metro cuadrado</dc:subject>
+          <dc:subject>Colombia</dc:subject>
+          <dc:subject>datos abiertos</dc:subject>
+          <dc:subject>Aptología</dc:subject>
+          <dc:subject>Suba</dc:subject>
+          <dc:title>Precio de venta de vivienda en Nueva Zelandia, Bogotá — octubre 2026</dc:title>
+          <dc:type>info:eu-repo/semantics/other</dc:type>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+<record>
+      <header>
+        <identifier>oai:zenodo.org:23470918</identifier>
+        <datestamp>2026-10-19T10:00:34Z</datestamp>
+        <setSpec>software</setSpec>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd">
+          <dc:creator>Mohammed Bello Sani</dc:creator>
+          <dc:date>2026-10-19</dc:date>
+          <dc:description>&amp;lt;h2&amp;gt;Lifestone v1.0.8 Release Notes&amp;lt;/h2&amp;gt;
+&amp;lt;h3&amp;gt;🎵 Hymnal Console Smooth Scrolling &amp;amp; Display Fix&amp;lt;/h3&amp;gt;
+&amp;lt;ul&amp;gt;
+&amp;lt;li&amp;gt;&amp;lt;strong&amp;gt;Unconstrained Multi-Directional Scrolling&amp;lt;/strong&amp;gt;: Replaced restricted viewport with native high-performance custom scrollbars across all 260 hymns and unfolded stanzas.&amp;lt;/li&amp;gt;
+&amp;lt;li&amp;gt;&amp;lt;strong&amp;gt;Badge &amp;amp; Content Layout&amp;lt;/strong&amp;gt;: Fixed clipping of 'BUILTIN' badge and stanza counts on hymn selection list.&amp;lt;/li&amp;gt;
+&amp;lt;li&amp;gt;&amp;lt;strong&amp;gt;Responsive Stanza Grid&amp;lt;/strong&amp;gt;: Stanza cards wrap lyrics cleanly with full access to all verses, choruses, and tags on any screen resolution.&amp;lt;/li&amp;gt;
+&amp;lt;/ul&amp;gt;</dc:description>
+          <dc:identifier>https://doi.org/10.5281/zenodo.23470918</dc:identifier>
+          <dc:identifier>oai:zenodo.org:23470918</dc:identifier>
+          <dc:publisher>Zenodo</dc:publisher>
+          <dc:relation>https://github.com/Sm-bello/Lifestone-church-ai/tree/v1.0.8</dc:relation>
+          <dc:relation>https://doi.org/10.5281/zenodo.23223260</dc:relation>
+          <dc:rights>info:eu-repo/semantics/openAccess</dc:rights>
+          <dc:rights>MIT License</dc:rights>
+          <dc:rights>https://opensource.org/licenses/MIT</dc:rights>
+          <dc:title>Sm-bello/Lifestone-church-ai: Lifestone v1.0.8</dc:title>
+          <dc:type>info:eu-repo/semantics/other</dc:type>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+<record>
+      <header>
+        <identifier>oai:zenodo.org:23470929</identifier>
+        <datestamp>2026-10-19T10:00:58Z</datestamp>
+        <setSpec>software</setSpec>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd">
+          <dc:creator>wanghongsheng01</dc:creator>
+          <dc:date>2026-10-19</dc:date>
+          <dc:description>&amp;lt;p&amp;gt;hlcl v1.0&amp;lt;/p&amp;gt;</dc:description>
+          <dc:identifier>https://doi.org/10.5281/zenodo.23470929</dc:identifier>
+          <dc:identifier>oai:zenodo.org:23470929</dc:identifier>
+          <dc:publisher>Zenodo</dc:publisher>
+          <dc:relation>https://github.com/wanghongsheng01/hlcl/tree/v1.0</dc:relation>
+          <dc:relation>https://doi.org/10.5281/zenodo.23470928</dc:relation>
+          <dc:rights>info:eu-repo/semantics/openAccess</dc:rights>
+          <dc:rights>MIT License</dc:rights>
+          <dc:rights>https://opensource.org/licenses/MIT</dc:rights>
+          <dc:title>wanghongsheng01/hlcl: hlcl</dc:title>
+          <dc:type>info:eu-repo/semantics/other</dc:type>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+<resumptionToken expirationDate="2026-10-19T10:53:16Z" cursor="0" completeListSize="608">.eJyNjkFvgjAAhf9Lr9OlrUUHiQfNaBcjuoFQ4WIqLcoo4EBXNuN_n_O2LFn28vJOX16-M2iVksCB96MRIWgIbTIilk0Q6YGD2Cng4B4ojGh2LXDOIGvqEjgAQzzsI9hH9gpBB3737ragB07VMde_GOsHU6qjkOIonhuV5d0VrkW-kSm49ECbNrXWm_zqBCjTpxh3KGFRFmP7JFlEJLWR5Lp4rChK1jMrYnu9LRIt2aKedLHxkMYptzxOaeCj_Qt39SBgfrmk1J9cM63cwP544OlrbPyn0PCiC1OGPAEjmGCULdzDTHbJIPj0p6rcx4uIBnPe8e06OSy5Nd-udHX7aYxAb5CrkrYes4ZpgUJV6fc1DI10DV66aJb824f87WPGY3D5Amfpge8.atX2JA.SaLWtPCrbKN6Fcmk4txnroGxd2s</resumptionToken>
+  </ListRecords>
+</OAI-PMH>

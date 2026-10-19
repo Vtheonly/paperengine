@@ -11,6 +11,7 @@ pub mod doaj;
 pub mod europepmc;
 pub mod http;
 pub mod normalize;
+pub mod oaipmh;
 pub mod openalex;
 pub mod osf;
 pub mod pmc;
@@ -31,6 +32,7 @@ use crate::sources::arxiv::{ArxivAdapter, ArxivConfig};
 use crate::sources::crossref::{CrossrefAdapter, CrossrefConfig};
 use crate::sources::doaj::{DoajAdapter, DoajConfig};
 use crate::sources::europepmc::{EuropePmcAdapter, EuropePmcConfig};
+use crate::sources::oaipmh::{OaiPmhAdapter, OaiPmhConfig};
 use crate::sources::openalex::{OpenAlexAdapter, OpenAlexConfig};
 use crate::sources::osf::{OsfAdapter, OsfConfig};
 use crate::sources::pmc::{PmcAdapter, PmcConfig};
@@ -154,6 +156,18 @@ pub fn builtin_registry(config: &BuiltinSourcesConfig) -> (SourceRegistry, Vec<S
         notes.push(format!("osf: {error}"));
     }
 
+    for config in [
+        OaiPmhConfig::zenodo(),
+        OaiPmhConfig::doaj(),
+        OaiPmhConfig::pmc(),
+    ] {
+        let id = config.source_id;
+        let adapter = OaiPmhAdapter::new(config).expect("oaipmh adapter construction cannot fail");
+        if let Err(error) = registry.register(Box::new(adapter)) {
+            notes.push(format!("{id}: {error}"));
+        }
+    }
+
     (registry, notes)
 }
 
@@ -179,6 +193,6 @@ mod tests {
         });
         assert!(registry.get("unpaywall").is_some());
         assert!(notes.is_empty(), "unexpected notes: {notes:?}");
-        assert_eq!(registry.source_ids().len(), 9);
+        assert_eq!(registry.source_ids().len(), 12);
     }
 }

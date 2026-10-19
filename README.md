@@ -26,11 +26,11 @@ Implemented now:
 - Validated configuration file (`paperengine.toml`) with unknown-key rejection and actionable budget errors.
 - GitHub Actions formatting, Clippy, test, and release-build checks; a separate manually-triggered live-test workflow.
 
-Still **not implemented**: OAI-PMH harvesting and repository-family adapters (#13), URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+Still **not implemented**: URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
 
 ## Source adapters
 
-Nine adapters are implemented behind the versioned source contract (`src/sources/contract.rs`). Each was verified against its live API, and each one's claims are scoped to what the source actually provides:
+Twelve adapters (nine REST + three OAI-PMH instances) are implemented behind the versioned source contract (`src/sources/contract.rs`). Each was verified against its live API, and each one's claims are scoped to what the source actually provides:
 
 | Source | Discovery | DOI lookup | Direct PDF | Verified |
 |---|---|---|---|---|
@@ -43,6 +43,7 @@ Nine adapters are implemented behind the versioned source contract (`src/sources
 | DOAJ | yes (application API) | yes | yes (publisher-deposited `content_type=pdf` links) | live + end-to-end acquisition |
 | Zenodo | yes (records API) | yes | yes (first `.pdf` file of publication records) | live + end-to-end acquisition |
 | OSF Preprints | yes (JSON:API, `filter[title]`) | – | yes (resolved `primary_file` downloads) | live + end-to-end acquisition |
+| OAI-PMH (Zenodo, DOAJ, PMC) | yes (`ListRecords` + `from` windows) | – | never — Dublin Core carries no full-text URLs | live |
 
 The opt-in live suite (`PAPERENGINE_LIVE_TESTS=1`, plus `PAPERENGINE_LIVE_ACQUIRE=1` for real downloads) exercises every adapter against its real endpoint — 19/19 passed on 2026-10-19 — and runs one real PDF acquisition per PDF-capable source (arXiv, DOAJ, OSF, Zenodo) through the production pipeline. See `tests/live_sources.rs` and [docs/SOURCE_COVERAGE.md](docs/SOURCE_COVERAGE.md) for the per-source registry with dates, blockers, and honest capability statements.
 

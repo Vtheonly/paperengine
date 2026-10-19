@@ -832,3 +832,161 @@ async fn live_openalex_end_to_end_pdf_acquisition() {
     assert_eq!(record.source_record_id, "W1997413633");
     acquire_one_real_pdf(&record, "OPENALEX").await;
 }
+
+// ---------------------------------------------------------------------------
+// Live tests for the OAI-PMH harvester family (#13). The protocol is verified
+// per repository: harvest records, resumption tokens, date windows, and the
+// honest "no PDF from Dublin Core" rule.
+// ---------------------------------------------------------------------------
+
+use paperengine::sources::oaipmh::{OaiPmhAdapter, OaiPmhConfig};
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_zenodo_oaipmh_harvests_records_with_resumption_tokens() {
+    if !live_tests_enabled() {
+        return;
+    }
+    let adapter = OaiPmhAdapter::new(OaiPmhConfig {
+        paper_only: false, // today's stream starts with semantics/other uploads
+        ..OaiPmhConfig::zenodo()
+    })
+    .unwrap();
+    let page = adapter
+        .discover(
+            &DiscoveryQuery {
+                text: "2026-10-19".into(), // from window
+                page_size: 0,
+            },
+            None,
+        )
+        .await
+        .expect("Zenodo OAI-PMH endpoint should be reachable");
+    assert!(!page.records.is_empty());
+    assert!(page.next_cursor.is_some(), "a resumption token must follow");
+    for record in &page.records {
+        assert!(record.source_record_id.starts_with("oai:zenodo.org:"));
+        assert!(record.doi().is_some());
+        assert!(record.oa_pdf_url.is_none(), "OAI DC never claims a PDF");
+    }
+    eprintln!(
+        "Zenodo OAI-PMH harvest OK: {} records, first {} ({}), token follows",
+        page.records.len(),
+        page.records[0].source_record_id,
+        page.records[0].title
+    );
+
+    // The default paper-only policy filters non-article uploads out.
+    let strict = OaiPmhAdapter::new(OaiPmhConfig::zenodo()).unwrap();
+    let strict_page = strict
+        .discover(
+            &DiscoveryQuery {
+                text: "2026-10-19".into(),
+                page_size: 0,
+            },
+            None,
+        )
+        .await
+        .expect("Zenodo OAI-PMH endpoint should be reachable");
+    let permissive_kept = page.records.len();
+    let strict_kept = strict_page.records.len();
+    eprintln!(
+        "Zenodo OAI-PMH paper filter: {permissive_kept} permissive -> {strict_kept} paper-like"
+    );
+    assert!(strict_kept <= permissive_kept);
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_doaj_oaipmh_journal_records_are_filtered_by_default() {
+    if !live_tests_enabled() {
+        return;
+    }
+    // DOAJ's stream starts with journal records (containers, not papers).
+    let permissive = OaiPmhAdapter::new(OaiPmhConfig {
+        paper_only: false,
+        ..OaiPmhConfig::doaj()
+    })
+    .unwrap();
+    let page = permissive
+        .discover(
+            &DiscoveryQuery {
+                text: "2026-09-01".into(),
+                page_size: 0,
+            },
+            None,
+        )
+        .await
+        .expect("DOAJ OAI-PMH endpoint should be reachable");
+    assert!(!page.records.is_empty());
+    assert!(page.next_cursor.is_some());
+    for record in &page.records {
+        assert!(record.source_record_id.starts_with("oai:doaj.org/"));
+        assert!(record.oa_pdf_url.is_none(), "OAI DC never claims a PDF");
+    }
+    eprintln!(
+        "DOAJ OAI-PMH harvest OK: {} records, first {} ({}), token follows",
+        page.records.len(),
+        page.records[0].source_record_id,
+        page.records[0].title
+    );
+
+    let strict = OaiPmhAdapter::new(OaiPmhConfig::doaj()).unwrap();
+    let strict_page = strict
+        .discover(
+            &DiscoveryQuery {
+                text: "2026-09-01".into(),
+                page_size: 0,
+            },
+            None,
+        )
+        .await
+        .expect("DOAJ OAI-PMH endpoint should be reachable");
+    eprintln!(
+        "DOAJ OAI-PMH paper filter: {} permissive -> {} strict (journal containers excluded)",
+        page.records.len(),
+        strict_page.records.len()
+    );
+    assert!(
+        strict_page.records.len() < page.records.len(),
+        "journal records must be excluded by the default paper-only policy"
+    );
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_pmc_oaipmh_harvests_article_records_with_identifiers() {
+    if !live_tests_enabled() {
+        return;
+    }
+    let adapter = OaiPmhAdapter::new(OaiPmhConfig::pmc()).unwrap();
+    let page = adapter
+        .discover(
+            &DiscoveryQuery {
+                text: "2026-10-10".into(),
+                page_size: 0,
+            },
+            None,
+        )
+        .await
+        .expect("PMC OAI-PMH endpoint should be reachable");
+    assert!(
+        !page.records.is_empty(),
+        "PMC OA stream should have records"
+    );
+    assert!(page.next_cursor.is_some());
+    for record in &page.records {
+        assert!(record
+            .source_record_id
+            .starts_with("oai:pubmedcentral.nih.gov:"));
+        assert!(record.doi().is_some(), "PMC records carry DOI identifiers");
+        assert!(record.oa_pdf_url.is_none(), "OAI DC never claims a PDF");
+    }
+    eprintln!(
+        "PMC OAI-PMH harvest OK: {} records, first {} ({}), doi {}",
+        page.records.len(),
+        page.records[0].source_record_id,
+        page.records[0].title,
+        page.records[0].doi().unwrap_or("<none>")
+    );
+}
