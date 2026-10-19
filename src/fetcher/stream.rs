@@ -257,7 +257,6 @@ impl ResumableDownloader {
                 reset_partial(&part_path, &metadata_path).await?;
                 offset = 0;
                 resumed_from = 0;
-                saved_metadata = None;
             } else if request_offset > 0 && response.status() == StatusCode::RANGE_NOT_SATISFIABLE {
                 if protocol_restarts >= 1 {
                     return Err(DownloadError::Protocol(
