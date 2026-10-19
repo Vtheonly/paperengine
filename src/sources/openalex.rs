@@ -56,6 +56,7 @@ impl OpenAlexAdapter {
             min_request_interval: config
                 .min_request_interval
                 .unwrap_or(OPENALEX_MIN_REQUEST_INTERVAL),
+            accept: None,
         })?;
         Ok(Self {
             descriptor: SourceDescriptor {

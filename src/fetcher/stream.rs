@@ -170,6 +170,7 @@ impl ResumableDownloader {
         }
 
         let client = Client::builder()
+            .user_agent(crate::sources::http::ENGINE_USER_AGENT)
             .connect_timeout(config.request_timeout)
             .timeout(config.request_timeout)
             .redirect(reqwest::redirect::Policy::limited(5))

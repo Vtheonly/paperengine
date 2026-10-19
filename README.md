@@ -26,7 +26,25 @@ Implemented now:
 - Validated configuration file (`paperengine.toml`) with unknown-key rejection and actionable budget errors.
 - GitHub Actions formatting, Clippy, test, and release-build checks; a separate manually-triggered live-test workflow.
 
-Still **not implemented**: the remaining sources from the scope (PMC, Europe PMC, DOAJ, Zenodo, OSF, generic OAI-PMH — see the [source coverage registry](docs/SOURCE_COVERAGE.md)), URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks.
+Still **not implemented**: OAI-PMH harvesting and repository-family adapters (#13), URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+
+## Source adapters
+
+Nine adapters are implemented behind the versioned source contract (`src/sources/contract.rs`). Each was verified against its live API, and each one's claims are scoped to what the source actually provides:
+
+| Source | Discovery | DOI lookup | Direct PDF | Verified |
+|---|---|---|---|---|
+| OpenAlex | yes (cursor pagination) | yes | via `best_oa_location.pdf_url` when present | live |
+| arXiv | yes (Atom API) | – | yes (`/abs/…` → `/pdf/…`) | live + end-to-end acquisition |
+| Crossref | yes (polite pool) | yes | never (metadata only) | live |
+| Unpaywall | – | yes | yes (`url_for_pdf`) | live |
+| Europe PMC | yes (REST search) | yes | never — no documented public PDF endpoint; JATS XML only | live |
+| PubMed Central | yes (E-utilities) | yes (`[PID]` exact match) | never — OA bulk utility observed 404 | live |
+| DOAJ | yes (application API) | yes | yes (publisher-deposited `content_type=pdf` links) | live + end-to-end acquisition |
+| Zenodo | yes (records API) | yes | yes (first `.pdf` file of publication records) | live + end-to-end acquisition |
+| OSF Preprints | yes (JSON:API, `filter[title]`) | – | yes (resolved `primary_file` downloads) | live + end-to-end acquisition |
+
+The opt-in live suite (`PAPERENGINE_LIVE_TESTS=1`, plus `PAPERENGINE_LIVE_ACQUIRE=1` for real downloads) exercises every adapter against its real endpoint — 19/19 passed on 2026-10-19 — and runs one real PDF acquisition per PDF-capable source (arXiv, DOAJ, OSF, Zenodo) through the production pipeline. See `tests/live_sources.rs` and [docs/SOURCE_COVERAGE.md](docs/SOURCE_COVERAGE.md) for the per-source registry with dates, blockers, and honest capability statements.
 
 ## Quick start (Linux)
 
@@ -119,7 +137,6 @@ budget). See the [source coverage registry](docs/SOURCE_COVERAGE.md) for per-sou
 status, capabilities, limitations, and last live-verification dates, and
 [docs/VERIFICATION.md](docs/VERIFICATION.md) for recorded evidence with sizes, hashes,
 and commands.
-
 ## Resumable downloader
 
 The library exposes an outer HTTP adapter through `paperengine::fetcher::stream::ResumableDownloader`. It streams to a sibling `.part` file, records ETag/Last-Modified metadata, and reuses partial bytes only when a usable validator and a matching `Content-Range` make continuation safe. If a server ignores Range or returns a changed object, the existing partial is discarded rather than appended to. Body size, request time, and total elapsed time are bounded.

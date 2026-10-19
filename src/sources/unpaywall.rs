@@ -53,6 +53,7 @@ impl UnpaywallAdapter {
             min_request_interval: config
                 .min_request_interval
                 .unwrap_or(UNPAYWALL_MIN_REQUEST_INTERVAL),
+            accept: None,
         })?;
         Ok(Self {
             descriptor: SourceDescriptor {

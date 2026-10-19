@@ -7,12 +7,17 @@
 pub mod arxiv;
 pub mod contract;
 pub mod crossref;
+pub mod doaj;
+pub mod europepmc;
 pub mod http;
 pub mod normalize;
 pub mod openalex;
+pub mod osf;
+pub mod pmc;
 pub mod runner;
 pub mod unpaywall;
 pub mod work_record;
+pub mod zenodo;
 
 pub use contract::{
     Capability, DiscoveryPage, DiscoveryQuery, RatePolicy, RegistrationError, RequestPacer,
@@ -24,8 +29,13 @@ pub use work_record::{IdentifierKind, WorkIdentifier, WorkRecord, WORK_RECORD_SC
 
 use crate::sources::arxiv::{ArxivAdapter, ArxivConfig};
 use crate::sources::crossref::{CrossrefAdapter, CrossrefConfig};
+use crate::sources::doaj::{DoajAdapter, DoajConfig};
+use crate::sources::europepmc::{EuropePmcAdapter, EuropePmcConfig};
 use crate::sources::openalex::{OpenAlexAdapter, OpenAlexConfig};
+use crate::sources::osf::{OsfAdapter, OsfConfig};
+use crate::sources::pmc::{PmcAdapter, PmcConfig};
 use crate::sources::unpaywall::{UnpaywallAdapter, UnpaywallConfig};
+use crate::sources::zenodo::{ZenodoAdapter, ZenodoConfig};
 
 /// Shared contact configuration for the built-in adapters.
 #[derive(Debug, Clone, Default)]
@@ -94,6 +104,56 @@ pub fn builtin_registry(config: &BuiltinSourcesConfig) -> (SourceRegistry, Vec<S
         Err(error) => notes.push(format!("unpaywall skipped: {error}")),
     }
 
+    let europepmc = EuropePmcAdapter::new(EuropePmcConfig {
+        min_request_interval: interval,
+        request_timeout: timeout,
+        ..EuropePmcConfig::default()
+    })
+    .expect("europepmc adapter construction cannot fail");
+    if let Err(error) = registry.register(Box::new(europepmc)) {
+        notes.push(format!("europepmc: {error}"));
+    }
+
+    let pmc = PmcAdapter::new(PmcConfig {
+        min_request_interval: interval,
+        request_timeout: timeout,
+        ..PmcConfig::default()
+    })
+    .expect("pmc adapter construction cannot fail");
+    if let Err(error) = registry.register(Box::new(pmc)) {
+        notes.push(format!("pmc: {error}"));
+    }
+
+    let doaj = DoajAdapter::new(DoajConfig {
+        min_request_interval: interval,
+        request_timeout: timeout,
+        ..DoajConfig::default()
+    })
+    .expect("doaj adapter construction cannot fail");
+    if let Err(error) = registry.register(Box::new(doaj)) {
+        notes.push(format!("doaj: {error}"));
+    }
+
+    let zenodo = ZenodoAdapter::new(ZenodoConfig {
+        min_request_interval: interval,
+        request_timeout: timeout,
+        ..ZenodoConfig::default()
+    })
+    .expect("zenodo adapter construction cannot fail");
+    if let Err(error) = registry.register(Box::new(zenodo)) {
+        notes.push(format!("zenodo: {error}"));
+    }
+
+    let osf = OsfAdapter::new(OsfConfig {
+        min_request_interval: interval,
+        request_timeout: timeout,
+        ..OsfConfig::default()
+    })
+    .expect("osf adapter construction cannot fail");
+    if let Err(error) = registry.register(Box::new(osf)) {
+        notes.push(format!("osf: {error}"));
+    }
+
     (registry, notes)
 }
 
@@ -119,6 +179,6 @@ mod tests {
         });
         assert!(registry.get("unpaywall").is_some());
         assert!(notes.is_empty(), "unexpected notes: {notes:?}");
-        assert_eq!(registry.source_ids().len(), 4);
+        assert_eq!(registry.source_ids().len(), 9);
     }
 }

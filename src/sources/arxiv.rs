@@ -48,6 +48,7 @@ impl ArxivAdapter {
             min_request_interval: config
                 .min_request_interval
                 .unwrap_or(ARXIV_MIN_REQUEST_INTERVAL),
+            accept: None,
         })?;
         Ok(Self {
             descriptor: SourceDescriptor {

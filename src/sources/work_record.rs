@@ -15,6 +15,7 @@ pub enum IdentifierKind {
     Doi,
     Arxiv,
     Pmid,
+    Pmc,
     Openalex,
     Crossref,
 }
@@ -25,6 +26,7 @@ impl IdentifierKind {
             IdentifierKind::Doi => "doi",
             IdentifierKind::Arxiv => "arxiv",
             IdentifierKind::Pmid => "pmid",
+            IdentifierKind::Pmc => "pmc",
             IdentifierKind::Openalex => "openalex",
             IdentifierKind::Crossref => "crossref",
         }

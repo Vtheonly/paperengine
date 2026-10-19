@@ -129,6 +129,24 @@ pub fn normalize_pmid(raw: &str) -> Option<String> {
     Some(stripped.to_owned())
 }
 
+/// Normalize a PubMed Central id. Accepts `PMC4302049` and the bare accession form
+/// `4302049`; both canonicalize to `PMC4302049`. Malformed inputs are rejected.
+pub fn normalize_pmcid(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    let stripped = trimmed
+        .strip_prefix("PMC")
+        .or_else(|| trimmed.strip_prefix("pmc"))
+        .unwrap_or(trimmed);
+    if stripped.is_empty() || !stripped.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let without_leading_zeros = stripped.trim_start_matches('0');
+    if without_leading_zeros.is_empty() {
+        return None;
+    }
+    Some(format!("PMC{without_leading_zeros}"))
+}
+
 /// Collapse interior whitespace runs and trim. Used for titles before comparison or storage.
 pub fn normalize_title(raw: &str) -> String {
     raw.split_whitespace().collect::<Vec<_>>().join(" ")
@@ -158,6 +176,7 @@ pub fn normalize_identifier(kind: IdentifierKind, raw: &str) -> Option<String> {
         IdentifierKind::Doi => normalize_doi(raw),
         IdentifierKind::Arxiv => normalize_arxiv_id(raw),
         IdentifierKind::Pmid => normalize_pmid(raw),
+        IdentifierKind::Pmc => normalize_pmcid(raw),
         IdentifierKind::Openalex => normalize_openalex_id(raw),
         IdentifierKind::Crossref => {
             let doi = normalize_doi(raw)?;
@@ -262,6 +281,21 @@ mod tests {
         assert!(normalize_pmid("PMC318904").is_none());
         assert!(normalize_pmid("").is_none());
         assert!(normalize_pmid("0").is_none());
+    }
+
+    #[test]
+    fn pmcid_forms_canonicalize_with_prefix() {
+        assert_eq!(normalize_pmcid("PMC4302049").as_deref(), Some("PMC4302049"));
+        assert_eq!(normalize_pmcid("pmc4302049").as_deref(), Some("PMC4302049"));
+        assert_eq!(normalize_pmcid("4302049").as_deref(), Some("PMC4302049"));
+        assert_eq!(
+            normalize_pmcid("PMC004302049").as_deref(),
+            Some("PMC4302049")
+        );
+        assert!(normalize_pmcid("PMC").is_none());
+        assert!(normalize_pmcid("0").is_none());
+        assert!(normalize_pmcid("PMC43020x49").is_none());
+        assert!(normalize_pmcid("").is_none());
     }
 
     #[test]

@@ -45,6 +45,7 @@ impl CrossrefAdapter {
             min_request_interval: config
                 .min_request_interval
                 .unwrap_or(CROSSREF_MIN_REQUEST_INTERVAL),
+            accept: None,
         })?;
         Ok(Self {
             descriptor: SourceDescriptor {

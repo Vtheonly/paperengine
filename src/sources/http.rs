@@ -22,6 +22,9 @@ pub struct SourceHttpClientOptions {
     pub request_timeout: Duration,
     /// Minimum spacing between requests, from the source's rate policy.
     pub min_request_interval: Duration,
+    /// Optional `Accept` header for sources with a documented media type
+    /// (e.g. OSF's `application/vnd.api+json`).
+    pub accept: Option<String>,
 }
 
 impl Default for SourceHttpClientOptions {
@@ -30,6 +33,7 @@ impl Default for SourceHttpClientOptions {
             contact_email: None,
             request_timeout: Duration::from_secs(30),
             min_request_interval: Duration::from_secs(1),
+            accept: None,
         }
     }
 }
@@ -47,9 +51,16 @@ impl SourceHttpClient {
             Some(email) if email.contains('@') => format!("{ENGINE_USER_AGENT}; mailto:{email}"),
             _ => ENGINE_USER_AGENT.to_owned(),
         };
+        let mut default_headers = reqwest::header::HeaderMap::new();
+        if let Some(accept) = options.accept.as_deref() {
+            if let Ok(value) = reqwest::header::HeaderValue::from_str(accept) {
+                default_headers.insert(reqwest::header::ACCEPT, value);
+            }
+        }
         let client = reqwest::Client::builder()
             .user_agent(user_agent.clone())
             .timeout(options.request_timeout)
+            .default_headers(default_headers)
             .build()
             .map_err(|error| SourceError::Network {
                 detail: error.to_string(),

@@ -134,20 +134,151 @@ PAPERENGINE_LIVE_ACQUIRE=1 PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sourc
 - **Limitations / next step:** no batch DOI resolution, no oa_locations enumeration
   beyond the best location (issue #11 remainder).
 
-## Named in scope but not implemented
+## Newly implemented and live-verified (issue #12, 2026-10-19)
 
-These sources are explicitly named in issues #12 and #13. They have **no adapter code**;
-the entries below record their documented access mechanisms so the next slice starts from
-facts, not guesses. None of them may be claimed as supported until an adapter passes the
-same verification layers.
+The five sources below were implemented in the second adapter wave and verified
+against their live endpoints on 2026-10-19. Their previous "not implemented"
+entries have been retired; the recorded access mechanisms turned out accurate.
+
+### Europe PMC
+
+- **Endpoint:** `https://www.ebi.ac.uk/europepmc/webservices/rest/search` (REST,
+  JSON; `page`/`pageSize`); JATS full text at `/rest/<PMCID>/fullTextXML`
+- **Adapter:** `src/sources/europepmc.rs` (contract version 1, adapter version 1)
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
+- **Access basis:** public REST API; no key or account required.
+- **Capabilities:** discovery (`query=` search), DOI lookup via `DOI:"..."`
+  fielded search, paper-type filtering (articles and PPR preprints by default).
+- **Identifiers provided:** accession id, PMID, PMCID, DOI.
+- **Full text:** **no direct PDF.** The site's `ptpmcrender.fcgi` render link is
+  undocumented and answered 403 when probed (2026-10-19); availability flags
+  (`isOpenAccess`, `inEPMC`, `hasPDF`) are retained verbatim in `raw` and never
+  turned into a claimed PDF. Documented full-text form is JATS XML, reserved for
+  the extraction slice (#31).
+- **Rate policy:** >=1 s between requests.
+- **Tests:** fixture tests in `src/sources/europepmc.rs` (`europepmc_search.json`);
+  live tests `live_europepmc_discovery_returns_metadata_without_pdf_links` and
+  `live_europepmc_doi_lookup_resolves_the_deseq2_paper`.
+- **Last live result (2026-10-19):** discovery returned 3 records for "DESeq2";
+  DOI lookup resolved `10.1186/s13059-014-0550-8` to PMID 25516281 / PMC4302049
+  with no PDF claim.
+- **Limitations / next step:** JATS XML ingestion (#31); no reference expansion.
+
+### PubMed Central (NCBI)
+
+- **Endpoint:** `https://eutils.ncbi.nlm.nih.gov/entrez/eutils` (`esearch` XML +
+  `esummary` JSON, `db=pmc`)
+- **Adapter:** `src/sources/pmc.rs` (contract version 1, adapter version 1)
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
+- **Access basis:** public E-utilities; NCBI documents up to 3 rps anonymous and
+  the adapter is stricter (>=1 s). Two spaced requests per discovery page.
+- **Capabilities:** discovery (`term=` with `retstart` paging), DOI lookup via
+  the `[PID]` field with exact re-verification from `articleids`.
+- **Identifiers provided:** PMCID, PMID, DOI, PII.
+- **Full text:** **no direct PDF.** The official bulk route, the OA utility
+  (`https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi`), answered 404 from this
+  environment when probed (2026-10-19, with and without an identifying
+  User-Agent). Recorded as a live blocker; not bypassed or worked around.
+- **Rate policy:** >=1 s between requests.
+- **Tests:** fixture tests in `src/sources/pmc.rs` (`pmc_esearch.xml`,
+  `pmc_esearch_doi.xml`, `pmc_esummary.json`, `pmc_esummary_deseq2.json`); live
+  tests `live_pmc_discovery_returns_metadata_without_pdf_links` and
+  `live_pmc_doi_lookup_resolves_the_deseq2_paper`.
+- **Last live result (2026-10-19):** discovery returned 3 records for
+  `DESeq2[title]`; DOI lookup resolved `10.1186/s13059-014-0550-8` to
+  PMC4302049 with no PDF claim.
+- **Limitations / next step:** re-probe `oa.fcgi` from other networks before any
+  full-text claim; treat 404 as source-side until proven otherwise.
+
+### DOAJ
+
+- **Endpoint:** `https://doaj.org/api/search/articles/<query>` (REST, JSON;
+  `page`/`pageSize`)
+- **Adapter:** `src/sources/doaj.rs` (contract version 1, adapter version 1)
+- **Status:** fixture-tested and live-verified (L1+L2+L3) on 2026-10-19
+- **Access basis:** public application API; no key.
+- **Capabilities:** discovery, DOI lookup (`doi:<doi>` search), direct PDF links
+  from publisher-deposited `bibjson.link` entries (`type=fulltext,
+  content_type=pdf`, http upgraded to https). HTML-only links become landing
+  pages; no link, no claim.
+- **Identifiers provided:** DOAJ record id, DOI.
+- **Full text:** yes for a subset of records - publisher-deposited direct PDFs
+  for fully OA journals.
+- **Rate policy:** >=1 s between requests.
+- **Tests:** fixture tests in `src/sources/doaj.rs` (`doaj_search.json`,
+  `doaj_doi.json`); live tests
+  `live_doaj_discovery_returns_records_with_publisher_pdf_links`,
+  `live_doaj_doi_lookup_resolves_the_jis_article`, and
+  `live_doaj_end_to_end_pdf_acquisition`.
+- **Last live result (2026-10-19):** discovery returned 5 records (1 with a
+  direct PDF link); end-to-end acquisition of
+  `https://jis.uk.ac.ir/article_2666_aef0585c84c617658c4d44807222bfbc.pdf`
+  produced a 1,457,506-byte, 16-page PDF, SHA-256
+  `ccdda17512101bce0864c54679bf073511148f78af6e1e9679d95fb669947fed`,
+  stored content-addressed with manifest provenance.
+- **Limitations / next step:** not every OA deposit includes a direct PDF link -
+  those records stay metadata-only by design.
+
+### Zenodo
+
+- **Endpoint:** `https://zenodo.org/api/records` (REST, JSON; `page`/`size`)
+- **Adapter:** `src/sources/zenodo.rs` (contract version 1, adapter version 1)
+- **Status:** fixture-tested and live-verified (L1+L2+L3) on 2026-10-19
+- **Access basis:** public records API; no key.
+- **Capabilities:** discovery (`q=` with quoted phrases), DOI lookup
+  (`doi:"..."` quoted search), direct PDF from the first `.pdf` file of
+  `publication`-typed records (`/api/records/<id>/files/<key>/content`).
+  Datasets, software, and images are excluded by the default paper-only policy.
+- **Identifiers provided:** record id, DOI (`10.5281/zenodo.<id>`).
+- **Full text:** yes - direct file downloads with per-file MD5 checksums
+  (retained verbatim in `raw`).
+- **Rate policy:** >=1 s between requests. Zenodo answers 403 to clients
+  without a User-Agent; the downloader now identifies the engine (fixed
+  2026-10-19).
+- **Tests:** fixture tests in `src/sources/zenodo.rs` (`zenodo_search.json`,
+  `zenodo_doi.json`); live tests
+  `live_zenodo_discovery_returns_publication_records_with_pdf_links`,
+  `live_zenodo_doi_lookup_resolves_a_publication`, and
+  `live_zenodo_end_to_end_pdf_acquisition`.
+- **Last live result (2026-10-19):** discovery returned 3 records (3 with direct
+  PDF links); end-to-end acquisition of
+  `https://zenodo.org/api/records/18289747/files/2026-doebeli-honegger-attention-is-all-you-need.pdf/content`
+  produced an 86,360-byte, 1-page PDF, SHA-256
+  `365ea2d4da0adbe6d7fa6ef1e13c1ad2c4a8ec9c00120684bf17f0c32d5e1acb`.
+- **Limitations / next step:** legacy records lack typed publication metadata;
+  the `.pdf`-file-plus-`publication`-type rule is the honest filter.
+
+### OSF Preprints
+
+- **Endpoint:** `https://api.osf.io/v2/preprints/` (JSON:API,
+  `application/vnd.api+json`; `page`/`page[size]`)
+- **Adapter:** `src/sources/osf.rs` (contract version 1, adapter version 1)
+- **Status:** fixture-tested and live-verified (L1+L2+L3) on 2026-10-19
+- **Access basis:** public API; no account needed for open preprints.
+- **Capabilities:** discovery via `filter[title]=` substring filter; direct PDF
+  from the resolved `primary_file` of published preprints (only `.pdf` primary
+  files become `oa_pdf_url`). Resolution costs one extra request per record,
+  spaced by the rate policy. No documented DOI filter - DOI lookup is declared
+  unsupported.
+- **Identifiers provided:** preprint guid, DOI when minted.
+- **Full text:** yes for published preprints with a PDF primary file.
+- **Rate policy:** >=1 s between requests.
+- **Tests:** fixture tests in `src/sources/osf.rs` (`osf_preprints.json`,
+  `osf_primary_file.json`); live tests
+  `live_osf_discovery_resolves_primary_files` and
+  `live_osf_end_to_end_pdf_acquisition`.
+- **Last live result (2026-10-19):** discovery returned 3 preprints (3 with
+  resolved primary-file PDFs); end-to-end acquisition of
+  `https://osf.io/download/6abeeb3c4eb5b6d31a39da8a/` produced a 408,201-byte,
+  13-page PDF, SHA-256
+  `5ca368518f4e76a8f9bff9c90bf4d4089ec96016c60cbcf8025485033e3c2de7`.
+- **Limitations / next step:** per-record file resolution is N+1 by API design
+  (`include=primary_file` was tested and returns no compound documents).
+
+## Named in scope but not implemented
 
 | Source | Canonical endpoint / mechanism | What it can provide | Next step |
 |---|---|---|---|
-| **PubMed Central (PMC)** | NCBI E-utilities (`eutils.ncbi.nlm.nih.gov`, `efetch`/`esearch`) and OA service; bulk via NCBI OA file shares | Metadata and, for OA subsets, JATS XML full text; PDFs only where explicitly offered in the OA package | Implement E-utilities adapter with API key support (#12) |
-| **Europe PMC** | REST API `https://www.ebi.ac.uk/europepmc/webservices/rest/search` and full-text XML for OA subset | Metadata; JATS XML full text for OA records | Implement adapter reusing the Unpaywall-style lookup shape (#12) |
-| **DOAJ** | REST API `https://doaj.org/api/search/articles/{query}`; application metadata | Article metadata for fully OA journals; links to publisher copies (usually not direct PDFs) | Implement discovery adapter (#12) |
-| **Zenodo** | REST API `https://zenodo.org/api/records` (Invenio) | Metadata and direct file download URLs for open uploads, with checksums | Implement adapter; verify file checksums from API metadata (#12) |
-| **OSF** | REST API `https://api.osf.io/v2/` (JSON:API) | Project/file metadata; direct file downloads for public nodes | Implement adapter (#12) |
 | **OAI-PMH repositories (generic)** | `Identify`/`ListRecords`/`ListIdentifiers` with `resumptionToken` flow | Harvestable metadata (Dublin Core and friends); full text only when the repository exposes content URLs | Implement the generic harvester behind the versioned source contract (#13) |
 
 ## What is deliberately not supported

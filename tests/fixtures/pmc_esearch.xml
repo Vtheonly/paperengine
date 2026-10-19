@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE eSearchResult PUBLIC "-//NLM//DTD esearch 20060628//EN" "https://eutils.ncbi.nlm.nih.gov/eutils/dtd/20060628/esearch.dtd">
+<eSearchResult><Count>6</Count><RetMax>2</RetMax><RetStart>0</RetStart><IdList>
+<Id>13362148</Id>
+<Id>12519442</Id>
+</IdList><TranslationSet/><QueryTranslation>"DESeq2"[Title]</QueryTranslation></eSearchResult>
