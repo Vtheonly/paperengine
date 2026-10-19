@@ -1,0 +1,17 @@
+[package]
+name = "paperengine"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Local-first research acquisition engine with a pure in-memory policy kernel"
+license = "MIT"
+
+[lib]
+name = "paperengine"
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "unwind"
