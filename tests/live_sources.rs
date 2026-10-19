@@ -70,6 +70,9 @@ async fn live_arxiv_discovery_returns_parseable_records_with_pdf_links() {
             &DiscoveryQuery {
                 text: "attention is all you need".into(),
                 page_size: 3,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -113,6 +116,9 @@ async fn live_arxiv_end_to_end_pdf_acquisition() {
             &DiscoveryQuery {
                 text: "attention is all you need".into(),
                 page_size: 3,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -208,6 +214,9 @@ async fn live_crossref_discovery_returns_metadata_without_pdf_links() {
             &DiscoveryQuery {
                 text: "attention is all you need".into(),
                 page_size: 3,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -352,6 +361,9 @@ async fn live_europepmc_discovery_returns_parseable_records_with_oa_pdf_links() 
                 // subset, so every returned record is expected to carry an OA PDF link.
                 text: "high-throughput sequencing AND OPEN_ACCESS:Y".into(),
                 page_size: 5,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -436,6 +448,9 @@ async fn live_europepmc_end_to_end_pdf_acquisition_or_blocked() {
             &DiscoveryQuery {
                 text: "high-throughput sequencing AND OPEN_ACCESS:Y".into(),
                 page_size: 5,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -550,6 +565,9 @@ async fn live_openalex_discovery_or_blocked_by_free_tier_budget() {
                 // (25, max 200) so an all-filtered page is not a plausible outcome
                 // while the strict non-empty assertion stays meaningful.
                 page_size: 25,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -712,6 +730,9 @@ async fn live_pmc_discovery_returns_metadata_without_pdf_links() {
             &DiscoveryQuery {
                 text: "DESeq2[title]".into(),
                 page_size: 3,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -765,6 +786,9 @@ async fn live_doaj_discovery_returns_records_with_publisher_pdf_links() {
             &DiscoveryQuery {
                 text: "attention is all you need".into(),
                 page_size: 5,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -839,6 +863,9 @@ async fn live_zenodo_discovery_returns_publication_records_with_pdf_links() {
             &DiscoveryQuery {
                 text: "attention is all you need".into(),
                 page_size: 3,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -917,6 +944,9 @@ async fn live_osf_discovery_resolves_primary_files() {
             &DiscoveryQuery {
                 text: "open access".into(),
                 page_size: 3,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -953,6 +983,9 @@ async fn live_osf_end_to_end_pdf_acquisition() {
             &DiscoveryQuery {
                 text: "Middle Way proposal towards an equitable open access".into(),
                 page_size: 5,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -1034,6 +1067,9 @@ async fn live_zenodo_oaipmh_harvests_records_with_resumption_tokens() {
             &DiscoveryQuery {
                 text: "2026-10-19".into(), // from window
                 page_size: 0,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -1060,6 +1096,9 @@ async fn live_zenodo_oaipmh_harvests_records_with_resumption_tokens() {
             &DiscoveryQuery {
                 text: "2026-10-19".into(),
                 page_size: 0,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -1090,6 +1129,9 @@ async fn live_doaj_oaipmh_journal_records_are_filtered_by_default() {
             &DiscoveryQuery {
                 text: "2026-09-01".into(),
                 page_size: 0,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -1114,6 +1156,9 @@ async fn live_doaj_oaipmh_journal_records_are_filtered_by_default() {
             &DiscoveryQuery {
                 text: "2026-09-01".into(),
                 page_size: 0,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -1142,6 +1187,9 @@ async fn live_pmc_oaipmh_harvests_article_records_with_identifiers() {
             &DiscoveryQuery {
                 text: "2026-10-10".into(),
                 page_size: 0,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -1165,5 +1213,144 @@ async fn live_pmc_oaipmh_harvests_article_records_with_identifiers() {
         page.records[0].source_record_id,
         page.records[0].title,
         page.records[0].doi().unwrap_or("<none>")
+    );
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_arxiv_oaipmh_harvests_preprints_and_follows_resumption() {
+    if !live_tests_enabled() {
+        return;
+    }
+    // The arXiv instance harvests the raw `arXiv` metadata format (no links in
+    // metadata; the Atom adapter remains the arXiv acquisition route). Recorded
+    // live on 2026-10-19: one day of arXiv updates is a single ~1300-record page
+    // whose resumption token's literal value is itself URL-encoded.
+    let adapter = OaiPmhAdapter::new(OaiPmhConfig::arxiv()).unwrap();
+    let discovery = adapter
+        .discover(
+            &DiscoveryQuery {
+                from_date: Some("2026-10-15".into()),
+                until_date: Some("2026-10-16".into()),
+                ..DiscoveryQuery::new("")
+            },
+            None,
+        )
+        .await
+        .expect("arXiv OAI-PMH endpoint should be reachable");
+    assert!(discovery.records.len() > 100, "expected a full arXiv page");
+    for record in &discovery.records {
+        assert!(record.source_record_id.starts_with("oai:arXiv.org:"));
+        assert!(record.arxiv_id().is_some());
+        assert!(
+            record.oa_pdf_url.is_none(),
+            "the arXiv raw format carries no links"
+        );
+        assert!(record.landing_url.is_none());
+        assert!(!record.title.is_empty());
+    }
+    let first = &discovery.records[0];
+    eprintln!(
+        "ARXIV OAI-PMH EVIDENCE: records={} first={} arxiv_id={:?} authors={} year={:?}",
+        discovery.records.len(),
+        first.source_record_id,
+        first.arxiv_id(),
+        first.authors.len(),
+        first.publication_year
+    );
+
+    // The token round-trip is the resumption acceptance test: the server must
+    // accept our percent-encoded token (page two may hold more records or be the
+    // final page - both prove the round-trip).
+    let token = discovery
+        .next_cursor
+        .clone()
+        .expect("arXiv page one must carry a resumption token");
+    let page_two = adapter
+        .discover(
+            &DiscoveryQuery {
+                from_date: Some("2026-10-15".into()),
+                until_date: Some("2026-10-16".into()),
+                ..DiscoveryQuery::new("")
+            },
+            Some(&token),
+        )
+        .await
+        .expect("resumption token round-trip must be accepted by arXiv");
+    let page_one_ids: std::collections::HashSet<String> = discovery
+        .records
+        .iter()
+        .map(|record| record.source_record_id.clone())
+        .collect();
+    if !page_two.records.is_empty() {
+        assert!(
+            page_two
+                .records
+                .iter()
+                .all(|record| !page_one_ids.contains(&record.source_record_id)),
+            "the token must advance the harvest"
+        );
+    }
+    eprintln!(
+        "ARXIV OAI-PMH page2 via resumption token: {} records (token accepted)",
+        page_two.records.len()
+    );
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_doaj_oaipmh_deleted_tombstones_are_counted_and_excluded() {
+    if !live_tests_enabled() {
+        return;
+    }
+    // Protocol-level view: DOAJ's stream carries deleted tombstones; they are
+    // parsed, counted, and never become work records. Recorded live on
+    // 2026-10-19: the from=2025-01-01 window served 300-record pages with 26
+    // (page one) and 7 (page two) deletions.
+    let adapter = OaiPmhAdapter::new(OaiPmhConfig {
+        min_request_interval: Some(std::time::Duration::from_millis(1_100)),
+        ..OaiPmhConfig::doaj()
+    })
+    .unwrap();
+    let page = adapter
+        .harvest_page(Some("2025-01-01"), None, None, None)
+        .await
+        .expect("DOAJ OAI-PMH endpoint should be reachable");
+    assert!(page.records.len() > 100, "expected a full DOAJ page");
+    assert!(page.deleted_count > 0, "expected deleted tombstones");
+    assert!(page.resumption_token.is_some());
+    assert!(
+        page.records.iter().all(|record| record
+            .header
+            .identifier
+            .starts_with("oai:doaj.org/journal:")),
+        "DOAJ's OAI stream is journal records only"
+    );
+
+    // Follow the token once: page two must advance the harvest.
+    let token = page.resumption_token.clone().expect("token checked above");
+    let page_two = adapter
+        .harvest_page(None, None, None, Some(&token))
+        .await
+        .expect("resumption token round-trip must be accepted by DOAJ");
+    let page_one_ids: std::collections::HashSet<String> = page
+        .records
+        .iter()
+        .map(|record| record.header.identifier.clone())
+        .collect();
+    assert!(
+        page_two
+            .records
+            .iter()
+            .all(|record| !page_one_ids.contains(&record.header.identifier)),
+        "the token must advance the harvest, not repeat page one"
+    );
+    eprintln!(
+        "DOAJ OAI-PMH DELETED EVIDENCE: page1 records={} deleted={} | page2 records={} deleted={} | completeListSize={:?}",
+        page.records.len(),
+        page.deleted_count,
+        page_two.records.len(),
+        page_two.deleted_count,
+        page.complete_list_size
     );
 }

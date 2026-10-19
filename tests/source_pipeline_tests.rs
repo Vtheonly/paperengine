@@ -144,6 +144,9 @@ async fn openalex_discovery_uses_cursor_pagination_over_http() {
             &DiscoveryQuery {
                 text: "papers".into(),
                 page_size: 1,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -162,6 +165,9 @@ async fn openalex_discovery_uses_cursor_pagination_over_http() {
             &DiscoveryQuery {
                 text: "papers".into(),
                 page_size: 1,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             page.next_cursor.as_deref(),
         )
@@ -201,6 +207,9 @@ async fn arxiv_discovery_paginates_with_start_offsets() {
             &DiscoveryQuery {
                 text: "atom".into(),
                 page_size: 1,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -282,6 +291,9 @@ async fn europepmc_discovery_uses_cursormark_pagination_over_http() {
             &DiscoveryQuery {
                 text: "attention".into(),
                 page_size: 1,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -306,6 +318,9 @@ async fn europepmc_discovery_uses_cursormark_pagination_over_http() {
             &DiscoveryQuery {
                 text: "attention".into(),
                 page_size: 1,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             page.next_cursor.as_deref(),
         )
@@ -387,6 +402,9 @@ async fn end_to_end_discover_then_acquire_into_content_addressed_library() {
             &DiscoveryQuery {
                 text: "end to end".into(),
                 page_size: 5,
+                from_date: None,
+                until_date: None,
+                set: None,
             },
             None,
         )
@@ -683,4 +701,135 @@ async fn download_budget_bounds_the_run_and_reports_exhaustion() {
     assert!(matches!(last.outcome, AcquisitionOutcome::Skipped { .. }));
     // Only one transfer hit the wire.
     assert_eq!(server.request_count(), 1);
+}
+
+// ---------------------------------------------------------------------------
+// OAI-PMH harvest over the wire (#13)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn oai_pmh_harvest_paginates_with_resumption_tokens_over_http() {
+    use paperengine::sources::oaipmh::{OaiPmhAdapter, OaiPmhConfig};
+    use paperengine::sources::runner::{run_discovery, DiscoveryBudget};
+
+    // Page one: one live article record, one deleted tombstone, and a resumption
+    // token. Page two: one live record and an empty resumptionToken element (the
+    // end-of-list marker). The fixture server serves routes sequentially, so page
+    // one answers the first request (no token) and page two the second (token).
+    let page_one_body = r#"<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+  <responseDate>2026-10-19T00:00:00Z</responseDate>
+  <request verb="ListRecords" metadataPrefix="oai_dc">http://127.0.0.1/oai</request>
+  <ListRecords>
+    <record>
+      <header>
+        <identifier>oai:example.org:live-1</identifier>
+        <datestamp>2026-10-01</datestamp>
+        <setSpec>fixture</setSpec>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Fixture Article One</dc:title>
+          <dc:creator>Author, First</dc:creator>
+          <dc:date>2026-10-01</dc:date>
+          <dc:type>Text</dc:type>
+          <dc:identifier>https://example.org/article/one</dc:identifier>
+          <dc:identifier>https://doi.org/10.1000/fixture.one</dc:identifier>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+    <record>
+      <header status="deleted">
+        <identifier>oai:example.org:deleted-1</identifier>
+        <datestamp>2026-10-01</datestamp>
+      </header>
+    </record>
+    <resumptionToken completeListSize="3">token-page-2</resumptionToken>
+  </ListRecords>
+</OAI-PMH>"#;
+    let page_two_body = r#"<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+  <responseDate>2026-10-19T00:00:01Z</responseDate>
+  <request verb="ListRecords">http://127.0.0.1/oai</request>
+  <ListRecords>
+    <record>
+      <header>
+        <identifier>oai:example.org:live-2</identifier>
+        <datestamp>2026-10-02</datestamp>
+      </header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Fixture Article Two</dc:title>
+          <dc:creator>Author, Second</dc:creator>
+          <dc:date>2026-10-02</dc:date>
+          <dc:type>Text</dc:type>
+          <dc:identifier>https://example.org/article/two</dc:identifier>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+    <resumptionToken completeListSize="3"></resumptionToken>
+  </ListRecords>
+</OAI-PMH>"#;
+
+    let server = FixtureServer::start(vec![
+        Route {
+            path: "/oai",
+            status: "200 OK",
+            content_type: "text/xml",
+            headers: Vec::new(),
+            body: page_one_body.as_bytes().to_vec(),
+        },
+        Route {
+            path: "/oai",
+            status: "200 OK",
+            content_type: "text/xml",
+            headers: Vec::new(),
+            body: page_two_body.as_bytes().to_vec(),
+        },
+    ]);
+
+    let adapter = OaiPmhAdapter::new(OaiPmhConfig {
+        api_base: format!("{}/oai", server.base_url),
+        metadata_prefix: "oai_dc".into(),
+        min_request_interval: Some(Duration::from_millis(0)),
+        request_timeout: Some(Duration::from_secs(5)),
+        ..OaiPmhConfig::zenodo()
+    })
+    .unwrap();
+
+    let mut seen: Vec<String> = Vec::new();
+    let summary = run_discovery(
+        &adapter,
+        &DiscoveryQuery {
+            text: String::new(),
+            from_date: Some("2026-10-01".into()),
+            until_date: Some("2026-10-02".into()),
+            set: Some("fixture".into()),
+            page_size: 0,
+        },
+        &DiscoveryBudget {
+            max_records: 10,
+            max_pages: 5,
+        },
+        |page| {
+            seen.extend(page.iter().map(|record| record.source_record_id.clone()));
+            Ok(())
+        },
+    )
+    .await
+    .unwrap();
+
+    // Two pages, two live work records: the deleted tombstone never becomes a
+    // work record, and both pages' records arrive through the token round-trip.
+    assert_eq!(summary.records_returned, 2);
+    assert_eq!(summary.pages_fetched, 2);
+    assert!(!summary.truncated);
+    assert_eq!(server.request_count(), 2, "exactly two wire requests");
+    assert_eq!(
+        seen,
+        vec![
+            "oai:example.org:live-1".to_owned(),
+            "oai:example.org:live-2".to_owned(),
+        ]
+    );
 }

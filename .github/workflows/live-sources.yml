@@ -2,16 +2,20 @@ name: Live source tests
 
 # Network-dependent live-source verification. Deliberately NOT part of the standard
 # CI that runs on every push: these tests contact real scholarly APIs (arXiv, Crossref,
-# Unpaywall, OpenAlex) within strict, tiny budgets, and one variant downloads exactly
-# one small open-access PDF through the production pipeline.
+# Unpaywall, OpenAlex, Europe PMC, PMC, DOAJ, Zenodo, OSF, and the OAI-PMH harvest
+# sources zenodo/doaj/pmc/arxiv-oaipmh) within strict, tiny budgets, and one variant
+# downloads one small open-access PDF per PDF-capable source through the production
+# pipeline.
 #
 # Run manually from the Actions tab ("Run workflow"), or on a schedule if desired.
+# Tests run single-threaded: each test constructs its own adapter and pacer, so
+# serialized execution is what actually honors each source's minimum interval.
 
 on:
   workflow_dispatch:
     inputs:
       acquire_real_pdf:
-        description: "Also download one real OA PDF (arXiv) through the pipeline"
+        description: "Also download one real OA PDF per PDF-capable source through the pipeline"
         type: boolean
         default: false
 
@@ -36,7 +40,7 @@ jobs:
           cargo fmt --all -- --check
           cargo clippy --all-targets --all-features -- -D warnings
           cargo test --all-features
-      - name: Live source smoke tests (bounded)
+      - name: Live source smoke tests (bounded, single-threaded)
         run: cargo test --test live_sources -- --ignored --nocapture --test-threads=1
       - name: Upload acquisition evidence
         if: env.PAPERENGINE_LIVE_ACQUIRE == '1'

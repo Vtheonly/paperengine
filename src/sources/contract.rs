@@ -150,10 +150,21 @@ pub enum SourceErrorClass {
 
 /// Query for discovery. `text` is a free-form scholarly query; adapters translate it into the
 /// source's documented query syntax.
+///
+/// The optional harvest bounds (`from_date`, `until_date`, `set`) are honored by
+/// harvest-capable adapters (OAI-PMH: selective harvesting) and ignored by search-based
+/// adapters. Dates use `YYYY-MM-DD` or `YYYY-MM-DDThh:mm:ssZ`, matching the repository's
+/// advertised granularity; validation is the receiving adapter's responsibility.
 #[derive(Debug, Clone)]
 pub struct DiscoveryQuery {
     pub text: String,
     pub page_size: u16,
+    /// Selective-harvest lower bound (OAI-PMH `from`).
+    pub from_date: Option<String>,
+    /// Selective-harvest upper bound (OAI-PMH `until`).
+    pub until_date: Option<String>,
+    /// Repository set spec for selective harvesting (OAI-PMH `set`).
+    pub set: Option<String>,
 }
 
 impl DiscoveryQuery {
@@ -161,6 +172,9 @@ impl DiscoveryQuery {
         Self {
             text: text.into(),
             page_size: 0,
+            from_date: None,
+            until_date: None,
+            set: None,
         }
     }
 }

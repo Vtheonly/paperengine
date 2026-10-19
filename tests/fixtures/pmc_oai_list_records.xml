@@ -1,0 +1,66 @@
+
+
+
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+    <responseDate>2026-10-19T11:09:34Z</responseDate>
+    <request verb="ListRecords" from="2026-10-01" metadataPrefix="oai_dc">https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/</request>
+    
+    
+    <!-- recorded 2026-10-19 from https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/ (verb=ListRecords, metadataPrefix=oai_dc, from=2026-10-01); trimmed to the first three records of ten plus the page's resumptionToken. Bodies are verbatim. -->
+<ListRecords><record>
+    <header>
+    <identifier>oai:pubmedcentral.nih.gov:6718227</identifier>
+    <datestamp>2020-09-02</datestamp>
+    
+        
+        <setSpec>cochrev</setSpec>
+        
+    
+</header>
+    <metadata>
+        
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd"><dc:title>Interventions to reduce tobacco use in people experiencing homelessness</dc:title><dc:creator>Vijayaraghavan, Maya</dc:creator><dc:creator>Elser, Holly</dc:creator><dc:creator>Apollonio, Dorie</dc:creator><dc:source>Cochrane Database Syst Rev</dc:source><dc:subject>Medicine General &amp; Introductory Medical Sciences</dc:subject><dc:description>This is a protocol for a Cochrane Review (Intervention). The objectives are as follows: To assess whether interventions designed to improve access to smoking cessation interventions for adults experiencing homelessness and interventions designed to help adults experiencing homelessness to quit smoking lead to increased engagement and tobacco abstinence. To also assess whether smoking cessation interventions for adults experiencing homelessness affect substance use and mental health.</dc:description><dc:publisher>John Wiley and Sons, Inc. and the Cochrane Library</dc:publisher><dc:date>2019-09-02</dc:date><dc:identifier>https://pmc.ncbi.nlm.nih.gov/articles/PMC6718227/</dc:identifier><dc:identifier>https://doi.org/10.1002/14651858.cd013413</dc:identifier><dc:type>Text</dc:type><dc:language>en</dc:language><dc:rights>Copyright &#169; 2019 The Cochrane Collaboration. Published by John Wiley &amp; Sons, Ltd.</dc:rights></oai_dc:dc>
+        
+    </metadata>
+</record>
+        
+        <record>
+    <header>
+    <identifier>oai:pubmedcentral.nih.gov:7616781</identifier>
+    <datestamp>2026-10-07</datestamp>
+    
+        
+        <setSpec>freae</setSpec>
+        
+    
+        
+        <setSpec>pmc-open</setSpec>
+        
+    
+</header>
+    <metadata>
+        
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd"><dc:title>Regulation of developmentally controlled enhancer activity by extrinsic signals in normal and malignant cells: AP-1 at the centre</dc:title><dc:creator>Maytum, Alexander</dc:creator><dc:creator>Obier, Nadine</dc:creator><dc:creator>Cauchy, Pierre</dc:creator><dc:creator>Bonifer, Constanze</dc:creator><dc:source>Front Epigenet Epigenom</dc:source><dc:subject>Epigenetics and Epigenomics</dc:subject><dc:description>The ability of cells to respond to external stimuli is one of the characteristics of life as we know it. Multicellular organisms have developed a huge machinery that interprets the cellular environment and instigates an appropriate cellular response by changing gene expression, metabolism, proliferation state and motility. Decades of research have studied the pathways transmitting the various signals within the cell. However, whilst we know most of the players, we know surprisingly little about the mechanistic details of how extrinsic signals are interpreted and integrated within the genome. In this article we revisit the long-standing debate of whether factors regulating cellular growth (cytokines) act in an instructive or permissive fashion on cell fate decisions. We touch upon this topic by highlighting the paradigm of AP-1 as one of the most important signaling-responsive transcription factor family and summarize our work and that of others to explain what is known about cytokine responsive cis-regulatory elements driving differential gene expression. We propose that cytokines and, by extension, multiple types of external signals are the main drivers of cell differentiation. They act via inducible transcription factors that transmit signaling processes to the genome and are essential for changing gene expression to drive transitions between gene regulatory networks. Importantly, inducible transcription factors cooperate with cell type specific factors within a pre-existing chromatin landscape and integrate multiple signaling pathways at specific enhancer elements, to both maintain and alter cellular identities. We also propose that signaling processes and signaling responsive transcription factors are at the heart of tumor development.</dc:description><dc:publisher>Frontiers Media SA</dc:publisher><dc:date>2024-09-16</dc:date><dc:identifier>https://pmc.ncbi.nlm.nih.gov/articles/PMC7616781/</dc:identifier><dc:identifier>https://pubmed.ncbi.nlm.nih.gov/39506987/</dc:identifier><dc:identifier>https://doi.org/10.3389/freae.2024.1465958</dc:identifier><dc:type>Text</dc:type><dc:language>en</dc:language><dc:rights>Copyright &#169; 2024 Maytum, Obier, Cauchy and Bonifer. This is an open-access article distributed under the terms of the Creative Commons Attribution License (CC BY). The use, distribution or reproduction in other forums is permitted, provided the original author(s) and the copyright owner(s) are credited and that the original publication in this journal is cited, in accordance with accepted academic practice. No use, distribution or reproduction is permitted which does not comply with these terms.</dc:rights><dc:rights>https://creativecommons.org/licenses/by/4.0/</dc:rights></oai_dc:dc>
+        
+    </metadata>
+</record>
+        
+        <record>
+    <header>
+    <identifier>oai:pubmedcentral.nih.gov:7617708</identifier>
+    <datestamp>2026-10-01</datestamp>
+    
+        
+        <setSpec>pmc-open</setSpec>
+        
+    
+</header>
+    <metadata>
+        
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd"><dc:title>Menstruation and Autism: a qualitative systematic review</dc:title><dc:creator>Ellis, Rebecca</dc:creator><dc:creator>Williams, Gemma</dc:creator><dc:creator>Caemawr, Selena</dc:creator><dc:creator>Craine, Monique</dc:creator><dc:creator>Holloway, Willow</dc:creator><dc:creator>Williams, Kathryn</dc:creator><dc:creator>Shaw, Sebastian C.K.</dc:creator><dc:creator>Grant, Aimee</dc:creator><dc:source>Autism Adulthood</dc:source><dc:subject>Article</dc:subject><dc:description>BACKGROUND: Menstruation is a biological process which can be irregular, painful, and co-occur with fatigue, social withdrawal, and increased emotions. There is some evidence to suggest Autistic people experience menstruation differently to non-Autistic people. METHODS: This systematic review (PROSPERO registration: CRD42023399674) searched four databases in February 2023. We used thematic synthesis to analyse qualitative studies of experiences related to menstruation for Autistic people and people providing support to Autistic people. We also appraised the quality of studies with CASP. RESULTS: Our thematic synthesis of twelve (eight peer-reviewed; four grey literature) sources identified differing priorities between parents, professionals, and Autistic people. Autistic people reported physical, emotional and social impacts of menstruation. Furthermore, there were reports of increased Autism-specific experiences during menstruation such as increased sensory sensitivities, burnout and anxiety, which were often unseen by those who supported them. Autistic people&#8217;s menstruation priorities were obtaining knowledge and skills ahead of their first period. However, parents and professionals focused on external behaviours including hygiene and obtaining independence in managing periods. Sources poorly described participant demographics and had a limited focus on Autistic perspectives. CONCLUSIONS: We conclude there needs to be tailored support to meet the needs of both Autistic individuals and those who support them. This should be informed by research which centers Autistic people.</dc:description><dc:date>2025-04-17</dc:date><dc:identifier>https://pmc.ncbi.nlm.nih.gov/articles/PMC7617708/</dc:identifier><dc:identifier>https://pubmed.ncbi.nlm.nih.gov/40438468/</dc:identifier><dc:identifier>https://doi.org/10.1089/aut.2024.0307</dc:identifier><dc:type>Text</dc:type><dc:language>en</dc:language><dc:rights>This work is licensed under a BY 4.0 International license.</dc:rights><dc:rights>https://creativecommons.org/licenses/by/4.0/</dc:rights></oai_dc:dc>
+        
+    </metadata>
+</record>
+        
+        <resumptionToken>Wzc2MTkyNzcsbnVsbCwiMjAyNi0xMC0wMSIsbnVsbCwib2FpX2RjIl0:WZjWNv3beIZeBZ3SnbdKOJQqFlGXqnLnSL5kc3FQtJo</resumptionToken></ListRecords></OAI-PMH>

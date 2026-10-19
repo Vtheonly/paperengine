@@ -156,11 +156,19 @@ pub fn builtin_registry(config: &BuiltinSourcesConfig) -> (SourceRegistry, Vec<S
         notes.push(format!("osf: {error}"));
     }
 
-    for config in [
+    // OAI-PMH harvest sources (#13): metadata-only adapters over the generic
+    // harvester. The arXiv instance keeps its 3 s courtesy interval; the others
+    // take the shared override when one is configured.
+    for mut config in [
         OaiPmhConfig::zenodo(),
         OaiPmhConfig::doaj(),
         OaiPmhConfig::pmc(),
+        OaiPmhConfig::arxiv(),
     ] {
+        config.request_timeout = timeout;
+        if config.min_request_interval.is_none() {
+            config.min_request_interval = interval;
+        }
         let id = config.source_id;
         let adapter = OaiPmhAdapter::new(config).expect("oaipmh adapter construction cannot fail");
         if let Err(error) = registry.register(Box::new(adapter)) {
@@ -193,7 +201,11 @@ mod tests {
             ..BuiltinSourcesConfig::default()
         });
         assert!(registry.get("unpaywall").is_some());
+        assert!(registry.get("zenodo-oaipmh").is_some());
+        assert!(registry.get("doaj-oaipmh").is_some());
+        assert!(registry.get("pmc-oaipmh").is_some());
+        assert!(registry.get("arxiv-oaipmh").is_some());
         assert!(notes.is_empty(), "unexpected notes: {notes:?}");
-        assert_eq!(registry.source_ids().len(), 12);
+        assert_eq!(registry.source_ids().len(), 13);
     }
 }

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+    <responseDate>2026-10-19T11:09:43Z</responseDate>
+                <request verb="ListRecords" metadataPrefix="arXiv" from="2026-10-15" until="2026-10-16">http://oaipmh.arxiv.org/oai</request>
+
+
+    <!-- recorded 2026-10-19 from https://oaipmh.arxiv.org/oai (verb=ListRecords, metadataPrefix=arXiv, from=2026-10-15, until=2026-10-16); trimmed to the first two records of 1300 plus the page's resumptionToken. Bodies are verbatim. -->
+<ListRecords><record>
+                <header>
+        <identifier>oai:arXiv.org:1509.00958</identifier>
+        <datestamp>2026-10-15</datestamp>
+            <setSpec>physics:physics:ins-det</setSpec>
+    </header>
+
+            <metadata>
+                        <arXiv xmlns="http://arxiv.org/OAI/arXiv/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXiv/ https://oaipmh.arxiv.org/OAI/arXiv.xsd">
+        <id>1509.00958</id>
+        <created>2026-10-13</created>
+            <updated>2026-10-15</updated>
+        <authors>
+                <author>
+                    <keyname>Patil</keyname>
+                        <forenames>Swapnil</forenames>
+                </author>
+        </authors>
+        <title>Improvements in the contemporary implementation of photoemission spectroscopy</title>
+            <categories>physics.ins-det</categories>
+            <comments>An update to arXiv1509.00958v5</comments>
+            <license>http://arxiv.org/licenses/nonexclusive-distrib/1.0/</license>
+            <abstract>In this short communication, we refined our previous manuscript to illustrate the corrections needed to the prevalent method for determining photoelectron counts in modern MCP-CCD-based ARPES detector systems and to implement our proposed &#39;new&#39; photoelectron-detection method therein. We therefore provide a simple, practical solution for verifying changes in the ARPES spectrum using the &#39;new&#39; method in modern ARPES spectrometers. The solution is simple enough to enable both the &#39;old&#39; and &#39;new&#39; methods within a single spectrometer, allowing a direct and rapid comparison of ARPES spectra collected under otherwise identical experimental conditions. We thus conclude our proposal.</abstract>
+    </arXiv>
+
+            </metadata>
+        </record>
+
+                    <record>
+                <header>
+        <identifier>oai:arXiv.org:2008.00805</identifier>
+        <datestamp>2026-10-15</datestamp>
+            <setSpec>cs:cs:CL</setSpec>
+    </header>
+
+            <metadata>
+                        <arXiv xmlns="http://arxiv.org/OAI/arXiv/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXiv/ https://oaipmh.arxiv.org/OAI/arXiv.xsd">
+        <id>2008.00805</id>
+        <created>2020-08-03</created>
+            <updated>2026-10-15</updated>
+        <authors>
+                <author>
+                    <keyname>Pàmies</keyname>
+                        <forenames>Marc</forenames>
+                </author>
+                <author>
+                    <keyname>Öhman</keyname>
+                        <forenames>Emily</forenames>
+                </author>
+                <author>
+                    <keyname>Kajava</keyname>
+                        <forenames>Kaisla</forenames>
+                </author>
+                <author>
+                    <keyname>Tiedemann</keyname>
+                        <forenames>Jörg</forenames>
+                </author>
+        </authors>
+        <title>LT@Helsinki at SemEval-2020 Task 12: Multilingual or language-specific BERT?</title>
+            <categories>cs.CL</categories>
+            <comments>Accepted at SemEval-2020 Task 12. Identical to camera-ready version except where adjustments to fit arXiv requirements were necessary</comments>
+            <doi>10.18653/v1/2020.semeval-1.205</doi>
+            <license>http://creativecommons.org/licenses/by/4.0/</license>
+            <abstract>This paper presents the different models submitted by the LT@Helsinki team for the SemEval 2020 Shared Task 12. Our team participated in sub-tasks A and C; titled offensive language identification and offense target identification, respectively. In both cases we used the so-called Bidirectional Encoder Representation from Transformer (BERT), a model pre-trained by Google and fine-tuned by us on the OLID and SOLID datasets. The results show that offensive tweet classification is one of several language-based tasks where BERT can achieve state-of-the-art results.</abstract>
+    </arXiv>
+
+            </metadata>
+        </record>
+
+                    <resumptionToken expirationDate='2026-10-20T00:00:00Z'>verb%3DListRecords%26metadataPrefix%3DarXiv%26from%3D2026-10-15%26until%3D2026-10-16%26skip%3D1300</resumptionToken></ListRecords></OAI-PMH>

@@ -1,4 +1,10 @@
 //! `paperengine discover` — bounded, download-free metadata discovery (#9 partial).
+//!
+//! Search-based sources take `--query`. Harvest-based OAI-PMH sources (ids ending in
+//! `-oai`, #13) have no free-text search: they take an empty query and are bounded by
+//! `--from-date`/`--until-date`, an optional `--set`, and the page/record budgets
+//! instead. The adapter refuses a non-empty query on a harvest source with a typed
+//! configuration error rather than silently ignoring it.
 
 use crate::cli::Flags;
 use paperengine::config::PaperEngineConfig;
@@ -8,11 +14,33 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
+/// Harvest-based source ids registered by the OAI-PMH adapters (#13).
+const HARVEST_SUFFIX: &str = "-oaipmh";
+
+fn is_harvest_source(source_id: &str) -> bool {
+    source_id.ends_with(HARVEST_SUFFIX)
+}
+
 pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     let flags = Flags::parse(args)?;
     let config = load_config(&flags)?;
     let source = flags.require("source")?;
-    let query_text = flags.require("query")?;
+    let harvest_source = is_harvest_source(&source);
+
+    // Query text: required and non-empty for search sources; optional for harvest
+    // sources, where a non-empty value is refused by the adapter with a typed error.
+    let query_text = match flags.optional("query") {
+        Some(text) if !text.trim().is_empty() => text,
+        Some(_) | None if harvest_source => String::new(),
+        Some(_) | None => {
+            return Err(format!(
+                "--query is required for search source `{source}`; harvest sources \
+                 (`-oaipmh` suffix) take a date window instead: an ISO date as --query, \
+                 or --from-date/--until-date (plus an optional --set)"
+            )
+            .into());
+        }
+    };
 
     let sources = config.builtin_sources_config();
     let (registry, notes) = builtin_registry(&sources);
@@ -37,9 +65,15 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     let page_size = flags
         .parse_optional::<u16>("page-size")?
         .unwrap_or(config.discovery.default_page_size);
+    let from_date = flags.optional("from-date");
+    let until_date = flags.optional("until-date");
+    let set = flags.optional("set");
     let query = DiscoveryQuery {
         text: query_text,
         page_size,
+        from_date,
+        until_date,
+        set,
     };
 
     // Stream records as JSONL either to a file (flushed per page, so an interrupted run
@@ -63,10 +97,34 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
         }
     };
 
-    eprintln!(
-        "discovering from `{}` (max {} records, max {} pages)…",
-        source, budget.max_records, budget.max_pages
-    );
+    if harvest_source {
+        eprintln!(
+            "harvesting from `{}` (max {} records, max {} pages{}{}{})…",
+            source,
+            budget.max_records,
+            budget.max_pages,
+            query
+                .from_date
+                .as_deref()
+                .map(|value| format!(", from {value}"))
+                .unwrap_or_default(),
+            query
+                .until_date
+                .as_deref()
+                .map(|value| format!(", until {value}"))
+                .unwrap_or_default(),
+            query
+                .set
+                .as_deref()
+                .map(|value| format!(", set {value}"))
+                .unwrap_or_default(),
+        );
+    } else {
+        eprintln!(
+            "discovering from `{}` (max {} records, max {} pages)…",
+            source, budget.max_records, budget.max_pages
+        );
+    }
     let summary = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?

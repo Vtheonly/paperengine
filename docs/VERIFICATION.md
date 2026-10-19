@@ -420,3 +420,194 @@ re-entry without `--refetch`; a connection-refused target classified `transient`
 `retry not due`; `--refetch` overrode the backoff, consumed the second attempt, then
 exhausted the budget to terminal failure; a further `--refetch` restarted the series.
 `paperengine inspect` prints the job ledger counts by state.
+
+---
+
+---
+
+# Independent run — parallel #13 slice (pre-merge tree), 2026-10-19
+
+A second agent implemented the #13 OAI-PMH slice in parallel (the `arxiv-oaipmh`
+instance with the `arXiv` raw format, the `harvest_page` protocol view,
+`list_sets`, until/set support, and the CLI `--from-date/--until-date/--set`
+flags). Both trees were live-verified independently before being merged into a
+single adapter; the numbers below describe that pre-merge tree.
+
+Environment: Linux x86-64 (container, 2 vCPU), rustc 1.99.1 (58cf8f9c3
+2026-10-13), cargo 1.99.1. All commands below were executed as written.
+
+## Static verification (source tree after the #13 slice, pre-push)
+
+```bash
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 164 passed, 0 failed, 25 ignored (live, opt-in)
+cargo build --release               # pass
+```
+
+Test breakdown: 144 unit tests (lib, 19 of them new for `src/sources/oaipmh.rs`),
+3 downloader integration, 1 architecture contract, 5 PDF validation, 11
+source-pipeline integration (1 new: `oai_pmh_harvest_paginates_with_resumption_tokens_over_http`),
+25 ignored live tests (3 new OAI-PMH).
+
+## Live OAI-PMH verification (Layer 2) — 2026-10-19
+
+Command (subset first, then the full suite):
+
+```bash
+PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture --test-threads=1 oai
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources -- --ignored --nocapture --test-threads=1
+```
+
+Result: **25/25 passed in 50.7 s**. The three new OAI-PMH tests, against the real
+endpoints, observed:
+
+| Test | Source | Observed result |
+|---|---|---|
+| `live_doaj_oai_harvests_journal_records_with_deletions` | DOAJ OAI | `from=2025-01-01` page 1: **300 records, 26 deleted**, `completeListSize=37098`; resumption-token round-trip returned a disjoint page 2 (300 records, 7 deleted); work-type filter mapped all records to **0 work records** (journal registry — the honest result) |
+| `live_pmc_oai_harvests_oa_article_metadata` | PMC OAI | `from=2026-10-01`: **10 records** (`dc:type=Text`); first `oai:pubmedcentral.nih.gov:6718227` with DOI `10.1002/14651858.cd013413`, PMCID `PMC6718227`, landing `https://pmc.ncbi.nlm.nih.gov/articles/PMC6718227/`; token round-trip returned a disjoint second page |
+| `live_arxiv_oai_harvests_preprints_and_follows_resumption` | arXiv OAI | `from=2026-10-15 until=2026-10-16`: **1300-record page**; first `oai:arXiv.org:1509.00958`; the resumption token (literal value itself URL-encoded) round-tripped through our percent-encoding and returned a disjoint second page of 1300 records |
+
+The full-suite run also re-verified all six real PDF acquisitions
+(byte-identical SHA-256 values to the earlier runs: `f2441d3d…` arXiv,
+`4f111c22…` OpenAlex + Unpaywall, `ccdda175…` DOAJ, `365ea2d4…` Zenodo,
+`5ca36851…` OSF). OpenAlex search remained BLOCKED (HTTP 429, shared free-tier
+budget) and is recorded as BLOCKED, not as a failure.
+
+## CLI workflow verification (real binary) — 2026-10-19
+
+Executed with `./target/release/paperengine`:
+
+```bash
+paperengine discover --source pmc-oai --from-date 2026-10-01 --max-records 5 --out /tmp/oai-discovery.jsonl
+paperengine acquire --from /tmp/oai-discovery.jsonl --library /tmp/oai-library --max-downloads 2
+```
+
+Observed: 5 records written (first `oai:pubmedcentral.nih.gov:6718227`, DOI
+`10.1002/14651858.cd013413`, PMCID `PMC6718227`, landing page recorded,
+`oa_pdf_url: null`); the acquire run examined 5 records and skipped all 5 with
+the typed reason "no direct OA PDF URL reported by the source" — no download was
+attempted and none was fabricated. Error paths verified with the same binary: a
+non-empty `--query` on a harvest source is refused with a typed configuration
+error; `--from-date 2026/10/01` is refused with the expected-format message;
+search sources still require `--query`.
+
+## Offline OAI-PMH coverage (Layer 1)
+
+Fixtures are recorded real responses (`tests/fixtures/doaj_oai_list_records.xml`
+with one live journal record, one deleted tombstone, and the page's resumption
+token; `doaj_oai_no_records.xml` — a complete real `noRecordsMatch` response;
+`pmc_oai_list_records.xml`, `arxiv_oai_list_records.xml`, `doaj_oai_list_sets.xml`).
+Unit tests cover: deleted-record parsing/counting/exclusion, `noRecordsMatch` →
+empty page, other OAI errors → typed `MalformedResponse`, responses with neither
+container nor error → typed rejection, malformed XML, token-exclusivity and
+selective-harvest URL building, date-shape validation, PMCID extraction from PMC
+article URLs, work-type policy behavior (DOAJ journals excluded under the
+default policy, admitted with a widened policy), and the arXiv format's
+`<id>`/`<license>`/`<journal-ref>` fields.
+
+## Known limitations
+
+- OAI-PMH instances are metadata-only by format; no Layer 3 acquisition exists
+  or is claimed for them.
+- DOAJ's OAI interface disseminates journal records only (verified live across
+  two pages, 600/600 records); its harvests map to zero work records under the
+  default paper-like policy.
+- arXiv OAI pages are large (~1300 records, ~4 MB per day-window); live tests
+  bound them with tight `from`/`until` windows and record budgets.
+- Zenodo's OAI-PMH endpoints answered 404 from this network on 2026-10-19
+  (probed `oai2`, `/oai2/`, `/api/oai2`, `/oai/`, `/oai-pmh`); recorded as a
+  blocker — the REST adapter remains Zenodo's supported route.
+- No performance claims are made in this report; benchmarks are tracked by #36.
+
+---
+
+# Verification Report — 2026-10-19 (fifth run: merged #13 tree)
+
+Two parallel #13 implementations were reconciled into a single adapter (the
+independent run above and the `ea1e827` tree): the merged adapter keeps the
+`-oaipmh` instance family (`zenodo-oaipmh`, `doaj-oaipmh`, `pmc-oaipmh`) with
+their live-verified paper-only dc:type policy and identifier mapping, and adds
+the `arxiv-oaipmh` instance harvesting the `arXiv` raw format, the
+`harvest_page` protocol view (records, deleted counts, completeListSize), and
+`list_sets` with bounded continuation. Both harvest-window input forms are
+supported: explicit `from`/`until`/`set` fields, or an ISO date in the query
+text; a non-date non-empty query text is refused with a typed error. The
+IdentifierKind variant for PMC accessions is `Pmcid` across the tree.
+
+Environment: Linux x86-64 (container, 2 vCPU), rustc 1.99.1 (58cf8f9c
+2026-10-13). All commands below were executed as written on the merged tree.
+
+```bash
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 193 passed, 0 failed, 29 ignored (live, opt-in)
+cargo build --release               # pass
+```
+
+Test breakdown: 158 unit tests (lib, 25 of them for `src/sources/oaipmh.rs`
+covering both fixture sets), 3 downloader, 1 architecture contract, 7 PDF
+validation, 13 source-pipeline integration (including
+`oai_pmh_harvest_paginates_with_resumption_tokens_over_http`), 6 storage
+finalization, 5 extraction; 29 ignored live tests (5 OAI-PMH).
+
+## Live suite on the merged tree (Layers 2 and 3)
+
+```bash
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources -- --ignored --nocapture --test-threads=1
+```
+
+Result: **29/29 passed in 55.8 s**, including five OAI-PMH harvests with
+resumption-token round-trips, six byte-identical real PDF acquisitions, and
+two honest BLOCKED states (Europe PMC render 403 on this datacenter network;
+OpenAlex search 429 free-tier). New OAI evidence observed in this run:
+
+| Test | Source | Observed result |
+|---|---|---|
+| `live_zenodo_oaipmh_harvests_records_with_resumption_tokens` | zenodo-oaipmh (`https://zenodo.org/oai2d`) | 50-record window harvest, every record with a DOI, token follows |
+| `live_doaj_oaipmh_journal_records_are_filtered_by_default` | doaj-oaipmh | 274 journal records, all excluded by the paper-only policy (containers are not papers) |
+| `live_doaj_oaipmh_deleted_tombstones_are_counted_and_excluded` | doaj-oaipmh | page 1: 300 records / 26 deleted; token round-trip page 2: 300 / 7; `completeListSize=37098`; zero work records after the paper-only filter |
+| `live_pmc_oaipmh_harvests_article_records_with_identifiers` | pmc-oaipmh | 10 article records, first `oai:pubmedcentral.nih.gov:6718227` with DOI and PMCID |
+| `live_arxiv_oaipmh_harvests_preprints_and_follows_resumption` | arxiv-oaipmh | 1300-record page from the 2026-10-15..16 window; the token (literal value itself URL-encoded) round-tripped and returned a disjoint second page of 1300 records |
+
+## CLI workflow verification (real binary, merged tree)
+
+```bash
+paperengine discover --source pmc-oaipmh --from-date 2026-10-01 --max-records 3 --out oa1.jsonl
+paperengine discover --source pmc-oaipmh --query 2026-10-01 --max-records 3 --out oa2.jsonl
+paperengine discover --source arxiv-oaipmh --from-date 2026-10-15 --until-date 2026-10-16 --max-records 3 --out oa3.jsonl
+```
+
+Observed: both harvest-window forms produce identical records (first
+`oai:pubmedcentral.nih.gov:6718227`, DOI + PMCID identifiers, landing via the
+DOI resolver fallback, `oa_pdf_url: null`); `arxiv-oaipmh` returns preprints
+with normalized arXiv ids and no links; a non-date `--query` value on a harvest
+source is refused with a typed configuration error; `paperengine self-test`
+reports all four OAI-PMH adapters; search sources still require `--query`.
+
+## Merge-correctness notes
+
+- A CLI regression introduced by the merge (harvest detection keyed on the
+  pre-merge `-oai` suffix while the merged ids end in `-oaipmh`) was caught by
+  this verification pass and fixed; the fixed binary is what the numbers above
+  were measured on.
+- The PMC landing-page rule follows the merged mapping: identifier values are
+  consumed as identifiers (DOI, PMCID) and the landing page falls back through
+  relations to the DOI resolver; `oa_pdf_url` is never set.
+
+## Known limitations
+
+- OAI-PMH instances are metadata-only by format; no Layer 3 acquisition exists
+  or is claimed for them.
+- DOAJ's OAI interface disseminates journal records only; its harvests map to
+  zero work records under the paper-only policy.
+- arXiv OAI pages are large (~1300 records, ~4 MB per day-window); live tests
+  bound them with tight windows and record budgets.
+- Zenodo's OAI-PMH interface lives at `oai2d`; the other probed paths 404 —
+  recorded in the coverage registry.
+- Europe PMC's render URL refuses this datacenter network (403) and OpenAlex
+  search remains 429-blocked on the shared free-tier budget; both are recorded
+  as BLOCKED, never bypassed.
+- No performance claims are made in this report; benchmarks are tracked by #36.

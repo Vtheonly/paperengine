@@ -331,39 +331,161 @@ entries have been retired; the recorded access mechanisms turned out accurate.
 - **Limitations / next step:** per-record file resolution is N+1 by API design
   (`include=primary_file` was tested and returns no compound documents).
 
-## OAI-PMH repositories (family, #13)
+## OAI-PMH harvest sources (#13, 2026-10-19)
 
-- **Endpoints:** one generic adapter class serves every repository that documents
-  OAI-PMH 2.0. Registered instances: `zenodo-oaipmh` (`https://zenodo.org/oai2d`),
-  `doaj-oaipmh` (`https://doaj.org/oai`), and `pmc-oaipmh`
-  (`https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/` — the modern location of the
-  legacy `ncbi.nlm.nih.gov/pmc/oai/oai.cgi`, which 301-redirects there).
-- **Adapter:** `src/sources/oaipmh.rs` (contract version 1, adapter version 1).
-- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19 for all
-  three instances.
-- **Access basis:** public OAI-PMH 2.0; `ListRecords` with `oai_dc`, `from`
-  date windows, and opaque `resumptionToken` continuation through the cursor.
-  >=1.5 s between requests.
-- **Capabilities:** metadata harvest only. `query.text` is parsed as the `from`
-  window when it is a valid ISO date; OAI-PMH has no search semantics. The
-  paper-only default excludes containers (`journal`) and non-paper objects
-  (`info:eu-repo/semantics/other`, datasets, software); `dc:type=Text`
-  (PubMed Central) is accepted as paper-like.
-- **Identifiers provided:** OAI identifier, DOI (from `dc:identifier`),
-  PMCID (from PMC article URLs).
-- **Full text:** **no direct PDF.** Dublin Core carries no reliable full-text
-  URLs and the adapter never claims one.
-- **Tests:** fixture tests in `src/sources/oaipmh.rs` (`zenodo_oai_records.xml`,
-  `doaj_oai_records.xml`, `doaj_oai_norecords.xml`, `pmc_oai_records.xml`,
-  recorded 2026-10-19); live tests `live_zenodo_oaipmh_*`,
-  `live_doaj_oaipmh_*`, `live_pmc_oaipmh_*` in `tests/live_sources.rs`.
-- **Last live result (2026-10-19):** Zenodo harvest of the 2026-10-19 window
-  returned 50 records (paper filter: 50 -> 18) with a resumption token; DOAJ
-  harvest from 2026-09-01 returned 274 journal records, all excluded by the
-  default paper-only policy; PMC harvest from 2026-10-10 returned 10 article
-  records with DOIs and PMCIDs. All three followed resumption tokens.
-- **Limitations / next step:** date-window harvesting only (no search);
-  incremental sync with persisted datestamp cursors is future work.
+A generic OAI-PMH 2.0 harvester (`src/sources/oaipmh.rs`) sits behind the same
+versioned source contract as every other adapter, implementing `ListRecords`,
+resumption-token continuation, from/until date windows, optional set specs,
+deleted-record handling, `ListSets` with bounded continuation, and a typed error
+taxonomy where `noRecordsMatch` is a legitimate empty page. Two metadata formats
+are implemented: `oai_dc` and the `arXiv` raw format. One adapter class serves
+every repository family that documents an OAI-PMH endpoint; four instances are
+registered: `zenodo-oaipmh` (`https://zenodo.org/oai2d`), `doaj-oaipmh`
+(`https://doaj.org/oai`), `pmc-oaipmh`
+(`https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/` — the modern location of the
+legacy `ncbi.nlm.nih.gov/pmc/oai/oai.cgi`, which 301-redirects there), and
+`arxiv-oaipmh` (`https://oaipmh.arxiv.org/oai` — the redirect target of the
+legacy `export.arxiv.org/oai2`).
+
+OAI-PMH is a harvest protocol, not a search interface. A harvest window is
+accepted in either form: explicit `from`/`until` dates plus an optional set on
+the discovery query, or a parseable ISO date in `query.text` (the historical
+form). A non-empty `query.text` that is not a valid ISO date is refused with a
+typed configuration error — never silently ignored. Following a resumption token
+uses the exclusive `verb`+`resumptionToken` form required by OAI-PMH 2.0 §2.1,
+with the token percent-encoded. Deleted records (`<header status="deleted">`)
+are parsed, counted, and excluded from work records; the per-page deleted count
+and raw parsed records are exposed through `OaiPmhAdapter::harvest_page` for the
+future incremental registry ingest (#9/#32), while the trait-level `discover`
+returns live work records only.
+
+Neither `oai_dc` nor the `arXiv` raw format carries direct full-text URLs, so
+every OAI-PMH adapter is **metadata-only**: `oa_pdf_url` is never set. `oai_dc`
+records are filtered by the paper-only default (`dc:type` substring test):
+containers (`journal`) and non-paper objects (`info:eu-repo/semantics/other`,
+datasets, software) stay out, while `dc:type=Text` (PubMed Central) is accepted
+as paper-like. The `arXiv` format has no type field — every record is a preprint —
+so the type policy is not applied to it.
+
+### Zenodo (OAI-PMH)
+
+- **Endpoint:** `https://zenodo.org/oai2d` (`oai_dc`)
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
+- **Access basis:** public OAI-PMH 2.0 endpoint; Dublin Core metadata harvest.
+- **Capabilities:** date-window harvest; today's stream starts with
+  `semantics/other` software/misc uploads, which the paper-only default excludes.
+- **Full text:** no — Dublin Core carries no reliable full-text URLs.
+- **Rate policy:** >=1.5 s between requests.
+- **Tests:** fixture `tests/fixtures/zenodo_oai_records.xml` (recorded
+  2026-10-19); unit tests in `src/sources/oaipmh.rs`; live test
+  `live_zenodo_oaipmh_harvests_records_with_resumption_tokens`.
+- **Last live result (2026-10-19):** harvest of the 2026-10-19 window returned 50
+  records (paper filter: 50 -> 18 in permissive mode) with a resumption token;
+  every record carried a DOI and none claimed a PDF.
+- **Limitations / next step:** date-window harvesting only; the REST records
+  adapter (`zenodo`) remains the direct-PDF route.
+
+### DOAJ (OAI-PMH)
+
+- **Endpoint:** `https://doaj.org/oai` (`oai_dc` only — verified by
+  `ListMetadataFormats`)
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
+- **Capabilities:** date-window harvest. **Journal records only** — verified
+  live: consecutive pages held 600/600 records with `dc:type=journal` and
+  `oai:doaj.org/journal:*` identifiers. The paper-only policy therefore maps
+  DOAJ-OAI harvests to **zero work records**; the interface is a journal
+  registry (licences, ISSNs, subjects, TOC links), recorded honestly as such.
+- **Deleted records:** 26 (page one) and 7 (page two) tombstones observed live on
+  2026-10-19 through `harvest_page`; parsed, counted, and excluded.
+- **Full text:** no — `oai_dc` carries no links; `oa_pdf_url` is never set.
+- **Rate policy:** >=1.5 s between requests.
+- **Tests:** fixtures `tests/fixtures/doaj_oai_records.xml` (their recorded
+  stream) and `doaj_oai_list_records.xml` (a full 300-record page trimmed to one
+  live journal record, one deleted tombstone, and the page's resumption token,
+  `completeListSize=37100`), plus `doaj_oai_norecords.xml` /
+  `doaj_oai_no_records.xml` (real `noRecordsMatch` responses) and
+  `doaj_oai_list_sets.xml` (538 LCC sets, first six kept); live tests
+  `live_doaj_oaipmh_journal_records_are_filtered_by_default` and
+  `live_doaj_oaipmh_deleted_tombstones_are_counted_and_excluded`.
+- **Last live result (2026-10-19):** `from=2025-01-01` page one returned 300
+  records (274 live journal + 26 deleted), `completeListSize=37098`; the
+  resumption-token round-trip returned a disjoint second page (300 records, 7
+  deleted); the paper-only filter mapped all of it to zero work records, as
+  expected for a journal registry.
+- **Limitations / next step:** no article records exist on this interface; use
+  the `doaj` application-API adapter for article discovery and direct PDF links.
+
+### PubMed Central (OAI-PMH)
+
+- **Endpoint:** `https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/` (`oai_dc`/`pmc`/
+  `pmc_fm` — verified by `ListMetadataFormats`)
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
+- **Capabilities:** date-window harvest; oai_dc article metadata over the
+  open-access subset.
+- **Identifiers provided:** OAI identifier (`oai:pubmedcentral.nih.gov:<PMCID>`),
+  DOI (`https://doi.org/…` `dc:identifier` values normalize through the shared
+  DOI canonicalizer), PMCID extracted from the PMC article-URL
+  `dc:identifier` shape.
+- **Full text:** no — `oai_dc` carries no links; the REST adapter and the
+  `pmc`/`pmc_fm` JATS formats remain separate scopes.
+- **Rate policy:** >=1.5 s between requests (stricter than NCBI's 3 rps
+  allowance).
+- **Tests:** fixtures `tests/fixtures/pmc_oai_records.xml` and
+  `pmc_oai_list_records.xml` (recorded real responses); live test
+  `live_pmc_oaipmh_harvests_article_records_with_identifiers`.
+- **Last live result (2026-10-19):** `from=2026-10-01` returned 10 records
+  (`dc:type=Text`), first `oai:pubmedcentral.nih.gov:6718227` with
+  DOI `10.1002/14651858.cd013413`, PMCID `PMC6718227`, and landing page
+  `https://pmc.ncbi.nlm.nih.gov/articles/PMC6718227/`; the resumption token
+  round-trip returned a disjoint second page of 10 records. Reproduced through
+  the CLI: `paperengine discover --source pmc-oaipmh --from-date 2026-10-01`.
+- **Limitations / next step:** day-granularity datestamps; observed `from`
+  filtering returning records whose `datestamp` predates the window — the
+  server's semantics, passed through unchanged and recorded here.
+
+### arXiv (OAI-PMH)
+
+- **Endpoint:** `https://oaipmh.arxiv.org/oai` (`oai_dc`/`arXiv`/`arXivOld`/
+  `arXivRaw` — verified by `ListMetadataFormats`); harvesting the `arXiv` raw
+  format
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
+- **Access basis:** public OAI-PMH 2.0 endpoint; arXiv's 3 s courtesy interval
+  is applied (same as the Atom API adapter).
+- **Capabilities:** date-window harvest; preprint metadata. Authors are
+  reconstructed as `forenames keyname` from the format's `keyname`/`forenames`
+  pairs; `<doi>` and `<journal-ref>` are captured when present.
+- **Identifiers provided:** OAI identifier (`oai:arXiv.org:<id>`), normalized
+  arXiv id from `<id>`, DOI from `<doi>`.
+- **Full text:** no — the `arXiv` raw format carries no links of any kind
+  (`oa_pdf_url` and `landing_url` are both unset); the Atom API adapter remains
+  the arXiv acquisition route. This is the honest split between the two arXiv
+  adapters and it is deliberate.
+- **Rate policy:** >=3 s between requests.
+- **Tests:** fixture `tests/fixtures/arxiv_oai_list_records.xml` (recorded real
+  response, trimmed to two of 1300 records with the token retained); unit tests
+  in `src/sources/oaipmh.rs`; live test
+  `live_arxiv_oaipmh_harvests_preprints_and_follows_resumption`.
+- **Last live result (2026-10-19):** `from=2026-10-15 until=2026-10-16` returned
+  a 1300-record page; first `oai:arXiv.org:1509.00958` ("Improvements in the
+  contemporary implementation of photoemission spectroscopy", Swapnil Patil,
+  created 2026-10-13). The resumption token — whose literal value is itself
+  URL-encoded (`verb%3DListRecords%26…`) — round-tripped through our
+  percent-encoding and returned a disjoint second page of 1300 records.
+- **Limitations / next step:** day granularity only; pages are large (~1300
+  records/day, ~4 MB) — bound harvests with tight windows and record budgets.
+
+## Named in scope but not implemented
+
+| Source | Canonical endpoint / mechanism | What it can provide | Next step |
+|---|---|---|---|
+| **Repository-family adapters beyond the generic OAI-PMH harvester** (DSpace, EPrints, Pure, Invenio, Islandora, Samvera, OPUS, MyCoRe) | standards-compliant OAI-PMH 2.0 deployments | Metadata via the generic adapter from library code today (`OaiPmhAdapter::new`); a family-specific adapter is justified only when a deployment diverges from the standard | none currently justified; revisit per repository when a divergence is observed |
+| **CLI construction of custom OAI-PMH endpoints** (`--oai-base-url` and friends) | `OaiPmhAdapter::new(OaiPmhConfig { api_base, metadata_prefix, … })` at library level | Custom repository harvests without code changes | remaining #13 scope |
+| **Cross-run registry ingest** (persisted datestamp cursors, deletion replay) | `OaiPmhAdapter::harvest_page` protocol view | Incremental sync between runs | remaining #13 scope, tracked with #9/#32 where it lands |
+
+Note: Zenodo's OAI-PMH interface was probed on 2026-10-19 — `zenodo.org/oai2`,
+`/oai2/`, `/api/oai2`, `/oai/`, and `/oai-pmh` answered 404, while `oai2d`
+serves the protocol; the REST records adapter (`zenodo`) remains the supported
+direct-PDF route and the OAI instance is metadata-only.
 
 ## What is deliberately not supported
 

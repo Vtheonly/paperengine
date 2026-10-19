@@ -19,6 +19,14 @@ Implemented now:
 - Structural PDF validation and quarantine (lopdf): signature, EOF, length, MIME, checksum, page-tree, catalog, and encryption checks, with redacted quarantine manifests.
 - A **versioned source-adapter contract** with typed error taxonomy (403/429 are stop conditions, never challenges), per-source rate policies with request pacing, and a registry that refuses incompatible plugins.
 - **Source adapters** using documented public APIs: OpenAlex, arXiv, Crossref, Unpaywall, and Europe PMC. Crossref is metadata-only by design; OpenAlex/Unpaywall resolve open-access locations; arXiv provides direct OA PDFs; Europe PMC adds `cursorMark` pagination, PMCID identifiers, and OA-subset PDF render links.
+- **OAI-PMH harvest sources** (#13): a generic OAI-PMH 2.0 harvester behind the same
+  versioned contract, registered as `zenodo-oaipmh`, `doaj-oaipmh`, `pmc-oaipmh`, and
+  `arxiv-oaipmh`. Harvest sources take a date window (explicit `--from-date`/
+  `--until-date` flags, or an ISO date as the `--query` value); a non-date query text
+  is refused with a typed error. Deleted records are parsed, counted, and excluded;
+  resumption tokens are followed with the exclusive `verb`+`token` form. All four are
+  metadata-only (`oai_dc`/`arXiv` formats carry no PDF links); DOAJ's OAI interface
+  disseminates journal records only — recorded honestly in the registry.
 - Identifier normalization for DOI, arXiv (modern + legacy), PMID, and PMCID with equivalent-form tests.
 - A bounded, download-free **discovery runner** and a CLI: `discover`, `lookup`, `acquire`, `extract`, `inspect`, `self-test`, and `rank`.
 - **Content-addressed storage**: `objects/<sha256[0..2]>/<sha256>.pdf` published by atomic rename with directory sync, provenance manifests published atomically (pending → fsync → rename — a crash can never tear one), per-run JSONL acquisition reports, dedup, a pre-request URL policy gate (scheme, credentials, host), and `unattributed_objects` reporting so a crash between object publication and manifest write is surfaced as incomplete rather than silently counted (`paperengine inspect` shows it).
@@ -27,11 +35,12 @@ Implemented now:
 - **Provenance-aware extraction (#31)**: real-parser PDF text and `/Info` metadata extraction over finalized objects, with a versioned extractor identity, per-object provenance records, content-addressed text artifacts (`extracted/`), bounded budgets, deterministic re-runs, and an `extract` CLI command.
 - GitHub Actions formatting, Clippy, test, and release-build checks; a separate manually-triggered live-test workflow.
 
-Still **not implemented**: URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+Still **not implemented**: CLI construction of custom OAI-PMH endpoints and cross-run
+registry ingest (remaining #13), URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
 
 ## Source adapters
 
-Twelve adapters (nine REST + three OAI-PMH instances) are implemented behind the versioned source contract (`src/sources/contract.rs`). Each was verified against its live API, and each one's claims are scoped to what the source actually provides:
+Thirteen adapters (nine REST + four OAI-PMH instances) are implemented behind the versioned source contract (`src/sources/contract.rs`). Each was verified against its live API, and each one's claims are scoped to what the source actually provides:
 
 | Source | Discovery | DOI lookup | Direct PDF | Verified |
 |---|---|---|---|---|
@@ -44,7 +53,10 @@ Twelve adapters (nine REST + three OAI-PMH instances) are implemented behind the
 | DOAJ | yes (application API) | yes | yes (publisher-deposited `content_type=pdf` links) | live + end-to-end acquisition |
 | Zenodo | yes (records API) | yes | yes (first `.pdf` file of publication records) | live + end-to-end acquisition |
 | OSF Preprints | yes (JSON:API, `filter[title]`) | – | yes (resolved `primary_file` downloads) | live + end-to-end acquisition |
-| OAI-PMH (Zenodo, DOAJ, PMC) | yes (`ListRecords` + `from` windows) | – | never — Dublin Core carries no full-text URLs | live |
+| Zenodo (OAI-PMH) | yes (`ListRecords` + date windows) | – | never — Dublin Core carries no full-text URLs | live |
+| DOAJ (OAI-PMH) | yes (harvest; journal records only) | – | never (`oai_dc` carries no links) | live |
+| PubMed Central (OAI-PMH) | yes (harvest, oai_dc) | – | never (`oai_dc` carries no links) | live |
+| arXiv (OAI-PMH) | yes (harvest, `arXiv` format) | – | never (raw format carries no links) | live |
 
 The opt-in live suite (`PAPERENGINE_LIVE_TESTS=1`, plus `PAPERENGINE_LIVE_ACQUIRE=1` for real downloads) exercises every adapter against its real endpoint — all tests passed on 2026-10-19, including one real PDF acquisition per PDF-capable source with a verified path (arXiv, DOAJ, OSF, Zenodo) and an honestly recorded BLOCKED state for the Europe PMC render URL on datacenter networks. See `tests/live_sources.rs` and [docs/SOURCE_COVERAGE.md](docs/SOURCE_COVERAGE.md) for the per-source registry with dates, blockers, and honest capability statements.
 ## Quick start (Linux)
@@ -78,8 +90,28 @@ rejected. The e-mail can also be passed with `--email` or `PAPERENGINE_CONTACT_E
     --max-records 5 --out discovery.jsonl
 ```
 
-Sources: `arxiv`, `openalex`, `crossref`, `europepmc`. Discovery writes one normalized JSONL record
-per work and structurally never downloads payload bytes.
+Sources: `arxiv`, `openalex`, `crossref`, `europepmc`, `pmc`, `doaj`, `zenodo`, `osf`.
+Discovery writes one normalized JSONL record per work and structurally never
+downloads payload bytes.
+
+### Harvest OAI-PMH sources (no downloads)
+
+Harvest sources (ids ending in `-oaipmh`) take a date window instead of a search
+phrase: pass `--from-date`/`--until-date` (and optionally `--set`), or an ISO date
+directly as the `--query` value. Any other non-empty query text is refused with a
+typed error — OAI-PMH has no free-text search.
+
+```bash
+./target/release/paperengine discover --source pmc-oaipmh \
+    --from-date 2026-10-01 --max-records 25 --out oa.jsonl
+./target/release/paperengine discover --source arxiv-oaipmh \
+    --from-date 2026-10-15 --until-date 2026-10-16 --max-records 10 --out oa.jsonl
+```
+
+Harvest sources are metadata-only (`oai_dc`/`arXiv` carry no PDF links); DOAJ's
+OAI interface disseminates journal records only, so its harvests map to zero
+work records under the default paper-only policy — see the source registry for
+the honest per-source capability statements.
 
 ### Resolve an open-access location for a DOI
 

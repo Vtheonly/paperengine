@@ -109,7 +109,9 @@ pub fn usage() -> &'static str {
 
 commands:
   rank       rank normalized candidates from stdin (offline, no network)
-  discover   search a scholarly source and write metadata JSONL (no downloads)
+  discover   search a scholarly source and write metadata JSONL (no downloads);
+             search sources take --query, OAI-PMH harvest sources (`-oai`) take
+             --from-date/--until-date/--set instead
   lookup     resolve a single DOI through a source adapter (no downloads)
   acquire    download permitted OA PDFs from a discovery file into a local library
   extract    extract text and metadata from a library's objects (offline)
