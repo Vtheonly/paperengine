@@ -17,8 +17,28 @@ Implemented now:
 - A bounded orchestrator that returns on backpressure and retains a pending event rather than silently dropping it or spinning.
 - A small `paperengine rank` CLI that reads normalized numeric candidate rows from standard input and emits JSON Lines decision events.
 - GitHub Actions formatting, Clippy, test, and release-build checks.
+- A bounded HTTP(S) downloader with byte and time budgets, ETag/Last-Modified-guarded resume, strict Range/Content-Range checks, safe restart on ignored or changed ranges, and no-clobber publication after a complete transfer.
+- Local HTTP fixture tests for interrupted/resumed bodies, 206 responses, ignored Range, changed objects, timeouts, size limits, and simulated ENOSPC.
 
-Still **not implemented**: source/provider adapters, URL safety and cached link validation, policy-aware network workers, durable queues/leases/retries, streaming/resumable downloads, PDF parsing and quarantine, content-addressed and multi-volume storage, background integrity scrubbing, JATS/TEI extraction, PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+Still **not implemented**: source/provider adapters, URL safety and cached link validation, policy-aware orchestration and source-specific rate limits, durable queues/leases/retries, PDF validation and quarantine, content-addressed and multi-volume storage, background integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+
+## Resumable downloader
+
+The library exposes an outer HTTP adapter through `paperengine::fetcher::stream::ResumableDownloader`. It streams to a sibling `.part` file, records ETag/Last-Modified metadata, and reuses partial bytes only when a usable validator and a matching `Content-Range` make continuation safe. If a server ignores Range or returns a changed object, the existing partial is discarded rather than appended to. Body size, request time, and total elapsed time are bounded. The destination path is published only after the transfer reaches EOF and advertised lengths have been checked; an existing destination is not overwritten.
+
+Example:
+
+```rust
+use paperengine::fetcher::stream::{DownloadConfig, ResumableDownloader};
+
+let downloader = ResumableDownloader::new(DownloadConfig::default())?;
+let result = downloader
+    .download("https://example.org/authorized-paper.pdf", "/library/paper.pdf")
+    .await?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The caller is responsible for validating source policy and authorization before requesting a URL. This adapter is not yet wired into the CLI or orchestrator, does not validate whether a payload is actually a PDF, and does not add content-addressed storage; issues #28 and #29 track those next layers. A failed transfer can be resumed by invoking `download` again with the same URL and destination. Resume support requires a strong ETag or Last-Modified validator; without one, a leftover partial is restarted from byte zero.
 
 ## Architecture boundary
 
