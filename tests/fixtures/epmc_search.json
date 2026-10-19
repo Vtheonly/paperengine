@@ -1,0 +1,514 @@
+{
+ "version": "6.9",
+ "hitCount": 234,
+ "nextCursorMark": "AoIIQBI/BCg1NjM4MTM2Mg==",
+ "nextPageUrl": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%22attention+is+all+you+need%22&cursorMark=AoIIQBI%2FBCg1NjM4MTM2Mg%3D%3D&resultType=core&pageSize=4&format=json",
+ "request": {
+  "queryString": "\"attention is all you need\"",
+  "resultType": "core",
+  "cursorMark": "*",
+  "pageSize": 4,
+  "sort": "",
+  "synonym": false
+ },
+ "resultList": {
+  "result": [
+   {
+    "id": "PPR1328024",
+    "source": "PPR",
+    "doi": "10.64898/2026.09.20.26363284",
+    "title": "Attention Is All You Need: A Universal Augmented Reality Surgical Navigation Framework",
+    "authorString": "Zhao D, Qiu Y, Guo Y, Luo X, Liu Y, Li X, Chen H, Cai X, Tian T.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Zhao D",
+       "lastName": "Zhao",
+       "firstName": "Danyang",
+       "initials": "D"
+      },
+      {
+       "fullName": "Qiu Y",
+       "lastName": "Qiu",
+       "firstName": "Yu",
+       "initials": "Y"
+      },
+      {
+       "fullName": "Guo Y",
+       "lastName": "Guo",
+       "firstName": "Yue",
+       "initials": "Y"
+      },
+      {
+       "fullName": "Luo X",
+       "lastName": "Luo",
+       "firstName": "Xutao",
+       "initials": "X"
+      },
+      {
+       "fullName": "Liu Y",
+       "lastName": "Liu",
+       "firstName": "Yuhan",
+       "initials": "Y"
+      },
+      {
+       "fullName": "Li X",
+       "lastName": "Li",
+       "firstName": "Xinru",
+       "initials": "X"
+      },
+      {
+       "fullName": "Chen H",
+       "lastName": "Chen",
+       "firstName": "Hui",
+       "initials": "H"
+      },
+      {
+       "fullName": "Cai X",
+       "lastName": "Cai",
+       "firstName": "Xiaoxiao",
+       "initials": "X"
+      },
+      {
+       "fullName": "Tian T",
+       "lastName": "Tian",
+       "firstName": "Taoran",
+       "initials": "T"
+      }
+     ]
+    },
+    "pubYear": "2026",
+    "abstractText": "Hard-tissue surgery requires precise spatial control, while conventional computer-assisted navigation presents guidance separately from the operative field. Augmented reality can bring navigation information closer to the surgeon, but how best to translate this information into intuitive intraoperative guidance remains underexplored. We therefore developed an augmented reality navigation system (ANS) that translates real-time deviations from the planned trajectory into co-located holographic action cues. Evaluation comprised typodont and ex vivo porcine experiments, a randomized crossover study in 40 dental trainees, and eight clinical cases. In porcine mandibles, ANS showed lower angular deviation than static and dynamic navigation (1.78\u00b0 vs 6.42\u00b0 and 4.02\u00b0). Among trainees, accuracy was comparable with dynamic navigation, while workload was lower (29.18 vs 33.15), usability higher (73.13 vs 68.88), and visual-focus ratings improved (3.55 vs 2.28). Clinical cases supported feasibility. These findings support co-located action guidance as an alternative interface paradigm for surgical navigation.",
+    "pubTypeList": {
+     "pubType": [
+      "Preprint"
+     ]
+    },
+    "bookOrReportDetails": {
+     "publisher": "medRxiv",
+     "yearOfPublication": 2026
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Free",
+       "availabilityCode": "F",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.64898/2026.09.20.26363284"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-09-26",
+    "firstPublicationDate": "2026-09-25",
+    "firstIndexDate": "2026-09-26",
+    "hasEvaluations": "N"
+   },
+   {
+    "id": "42059664",
+    "source": "MED",
+    "pmid": "42059664",
+    "pmcid": "PMC13130204",
+    "fullTextIdList": {
+     "fullTextId": [
+      "PMC13130204"
+     ]
+    },
+    "doi": "10.1093/bib/bbag239",
+    "title": "Correction to: Attention is all you need: utilizing attention in AI-enabled drug discovery.",
+    "journalInfo": {
+     "issue": "2",
+     "volume": "27",
+     "journalIssueId": 4136578,
+     "dateOfPublication": "2026 Mar",
+     "monthOfPublication": 3,
+     "yearOfPublication": 2026,
+     "journal": {
+      "medlineAbbreviation": "Brief Bioinform",
+      "title": "Briefings in bioinformatics",
+      "essn": "1477-4054",
+      "issn": "1467-5463",
+      "isoabbreviation": "Brief Bioinform",
+      "nlmid": "100912837"
+     },
+     "printPublicationDate": "2026-03-01"
+    },
+    "pubYear": "2026",
+    "pageInfo": "bbag239",
+    "publicationStatus": "ppublish",
+    "language": "eng",
+    "pubModel": "Print",
+    "pubTypeList": {
+     "pubType": [
+      "Published Erratum",
+      "correction"
+     ]
+    },
+    "subsetList": {
+     "subset": [
+      {
+       "code": "IM",
+       "name": "Index Medicus"
+      }
+     ]
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Subscription required",
+       "availabilityCode": "S",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.1093/bib/bbag239"
+      },
+      {
+       "availability": "Open access",
+       "availabilityCode": "OA",
+       "documentStyle": "html",
+       "site": "Europe_PMC",
+       "url": "https://europepmc.org/articles/PMC13130204"
+      },
+      {
+       "availability": "Open access",
+       "availabilityCode": "OA",
+       "documentStyle": "pdf",
+       "site": "Europe_PMC",
+       "url": "https://europepmc.org/articles/PMC13130204?pdf=render"
+      }
+     ]
+    },
+    "commentCorrectionList": {
+     "commentCorrection": [
+      {
+       "source": "MED",
+       "id": "38189543",
+       "reference": "Brief Bioinform. 2023 Nov 22;25(1):bbad467. doi: 10.1093/bib/bbad467.",
+       "type": "Erratum for",
+       "orderIn": 1
+      }
+     ]
+    },
+    "isOpenAccess": "Y",
+    "inEPMC": "Y",
+    "inPMC": "Y",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "Y",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "license": "cc by-nc",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2026-04-30",
+    "dateOfRevision": "2026-05-02",
+    "firstPublicationDate": "2026-03-01",
+    "firstIndexDate": "2026-04-30",
+    "fullTextReceivedDate": "2026-05-18",
+    "hasEvaluations": "N"
+   },
+   {
+    "id": "PPR1136986",
+    "source": "PPR",
+    "doi": "10.21203/rs.3.rs-8399522/v1",
+    "title": "\"All You Need\" is Not All You Need for a Paper Title: On the Origins of a Scientific Meme",
+    "authorString": "Alyakin A.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Alyakin A",
+       "lastName": "Alyakin",
+       "firstName": "Anton",
+       "initials": "A"
+      }
+     ]
+    },
+    "pubYear": "2025",
+    "abstractText": "<title>Abstract</title>  <p>  The 2017 paper \"Attention Is All You Need\" introduced the Transformer architecture, and inadvertently spawned one of machine learning's most persistent naming conventions. We analyze 717 arXiv preprints containing \"All You Need\" in their titles (2009-2025), finding exponential growth (R  <sup>2</sup>  > 0.994) following the original paper, with 200 titles in 2025 alone. Among papers following the canonical \"X [Is] All You Need\" structure, \"Attention\" remains the most frequently claimed necessity (28 occurrences). Situating this phenomenon within memetic theory, we argue the pattern's success reflects competitive pressures in scientific communication that increasingly favor memorability over precision. Whether this trend represents harmless academic whimsy or symptomatic sensationalism, we leave-with appropriate self-awareness-to the reader.  </p>",
+    "pubTypeList": {
+     "pubType": [
+      "Preprint"
+     ]
+    },
+    "bookOrReportDetails": {
+     "publisher": "Research Square",
+     "yearOfPublication": 2025
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Free",
+       "availabilityCode": "F",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.21203/rs.3.rs-8399522/v1"
+      }
+     ]
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasData": "N",
+    "license": "cc by",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "N",
+    "dateOfCreation": "2025-12-23",
+    "firstPublicationDate": "2025-12-22",
+    "firstIndexDate": "2025-12-23",
+    "versionList": {
+     "version": [
+      {
+       "id": "PPR1136986",
+       "source": "PPR",
+       "versionNumber": 1,
+       "firstPublishDate": "2025-12-22",
+       "pubTypeList": {
+        "pubType": [
+         "preprint"
+        ]
+       },
+       "hasEvaluations": "N"
+      }
+     ]
+    },
+    "versionNumber": 1,
+    "hasEvaluations": "N"
+   },
+   {
+    "id": "42715167",
+    "source": "MED",
+    "pmid": "42715167",
+    "pmcid": "PMC13557405",
+    "fullTextIdList": {
+     "fullTextId": [
+      "PMC13557405"
+     ]
+    },
+    "doi": "10.1371/journal.pone.0356147",
+    "title": "How science gets by with a little help from the Beatles: Detecting cultural wordplay in scientific literature using large language models.",
+    "authorString": "Budel G, Kooij RE, Tjepkema M.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Budel G",
+       "lastName": "Budel",
+       "firstName": "Gabriel",
+       "initials": "G",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0003-0622-6492"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Faculty of Electrical Engineering, Mathematics and Computer Science, Delft University of Technology, Delft, The Netherlands."
+         },
+         {
+          "affiliation": "Koninklijke KPN N.V., Rotterdam, The Netherlands."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Kooij RE",
+       "lastName": "Kooij",
+       "firstName": "Robert E",
+       "initials": "RE",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Faculty of Electrical Engineering, Mathematics and Computer Science, Delft University of Technology, Delft, The Netherlands."
+         },
+         {
+          "affiliation": "Unit ICT, Strategy & Policy, TNO (Netherlands Organisation for Applied Scientific Research), The Hague, The Netherlands."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Tjepkema M",
+       "lastName": "Tjepkema",
+       "firstName": "Michiel",
+       "initials": "M",
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Faculty of Law, Radboud Universiteit Nijmegen, Nijmegen, The Netherlands."
+         },
+         {
+          "affiliation": "Co-host to the Dutch Beatles podcast Fab4Cast, Hilversum, The Netherlands."
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "authorIdList": {
+     "authorId": [
+      {
+       "type": "ORCID",
+       "value": "0000-0003-0622-6492"
+      }
+     ]
+    },
+    "dataLinksTagsList": {
+     "dataLinkstag": [
+      "supporting_data"
+     ]
+    },
+    "journalInfo": {
+     "issue": "9",
+     "volume": "21",
+     "journalIssueId": 4252158,
+     "dateOfPublication": "2026 ",
+     "monthOfPublication": 0,
+     "yearOfPublication": 2026,
+     "journal": {
+      "medlineAbbreviation": "PLoS One",
+      "title": "PloS one",
+      "essn": "1932-6203",
+      "issn": "1932-6203",
+      "isoabbreviation": "PLoS One",
+      "nlmid": "101285081"
+     },
+     "printPublicationDate": "2026-01-01"
+    },
+    "pubYear": "2026",
+    "pageInfo": "e0356147",
+    "abstractText": "The Beatles' cultural influence reaches well beyond music into television, fashion, and global media. As we show, it reaches into scientific publishing too. This study documents how often Beatles song titles and lyrics appear in academic article titles, identifying 2,237 exact references and 963 instances of creative wordplay in data from Scopus. Working from a curated list of Beatles songs and lyrics, we combine automated title queries with large-language-model screening, followed by manual verification, to detect both exact references and wordplay. To our knowledge, this is the first study to systematically identify wordplay on Beatles song titles and lyrics in scientific article titles. We report which titles and lyrics are referenced most often, trace how their use has grown over the decades, and show that this growth has outpaced the expansion of the scientific literature as a whole while varying systematically across disciplines. The result is the first large-scale, cross-disciplinary account of how the Beatles have left their mark on scientific writing.",
+    "affiliation": "Faculty of Electrical Engineering, Mathematics and Computer Science, Delft University of Technology, Delft, The Netherlands.",
+    "publicationStatus": "epublish",
+    "language": "eng",
+    "pubModel": "Electronic-eCollection",
+    "pubTypeList": {
+     "pubType": [
+      "research-article",
+      "Journal Article"
+     ]
+    },
+    "meshHeadingList": {
+     "meshHeading": [
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Humans"
+      },
+      {
+       "majorTopic_YN": "Y",
+       "descriptorName": "Science"
+      },
+      {
+       "majorTopic_YN": "Y",
+       "descriptorName": "Music"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Publications"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Publishing"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Large Language Models"
+      }
+     ]
+    },
+    "subsetList": {
+     "subset": [
+      {
+       "code": "IM",
+       "name": "Index Medicus"
+      }
+     ]
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Subscription required",
+       "availabilityCode": "S",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.1371/journal.pone.0356147"
+      },
+      {
+       "availability": "Open access",
+       "availabilityCode": "OA",
+       "documentStyle": "html",
+       "site": "Europe_PMC",
+       "url": "https://europepmc.org/articles/PMC13557405"
+      },
+      {
+       "availability": "Open access",
+       "availabilityCode": "OA",
+       "documentStyle": "pdf",
+       "site": "Europe_PMC",
+       "url": "https://europepmc.org/articles/PMC13557405?pdf=render"
+      }
+     ]
+    },
+    "isOpenAccess": "Y",
+    "inEPMC": "Y",
+    "inPMC": "Y",
+    "citedByCount": 1,
+    "hasReferences": "Y",
+    "hasTextMinedTerms": "Y",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "Y",
+    "hasBook": "N",
+    "hasSuppl": "Y",
+    "hasLabsLinks": "N",
+    "hasData": "Y",
+    "license": "cc by",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "Y",
+    "tmAccessionTypeList": {
+     "accessionType": [
+      "doi"
+     ]
+    },
+    "dateOfCompletion": "2026-09-09",
+    "dateOfCreation": "2026-09-09",
+    "dateOfRevision": "2026-09-14",
+    "electronicPublicationDate": "2026-09-09",
+    "firstPublicationDate": "2026-09-09",
+    "firstIndexDate": "2026-09-10",
+    "fullTextReceivedDate": "2026-09-13",
+    "hasEvaluations": "N"
+   }
+  ]
+ }
+}

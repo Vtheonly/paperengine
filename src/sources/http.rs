@@ -14,6 +14,23 @@ pub const ENGINE_USER_AGENT: &str = concat!(
     " (+https://github.com/Vtheonly/paperengine)"
 );
 
+/// Percent-encode a value for use in a query string (RFC 3986 unreserved characters kept).
+pub(crate) fn urlencode(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char)
+            }
+            _ => {
+                encoded.push('%');
+                encoded.push_str(&format!("{byte:02X}"));
+            }
+        }
+    }
+    encoded
+}
+
 #[derive(Debug, Clone)]
 pub struct SourceHttpClientOptions {
     /// Contact e-mail appended to the User-Agent for polite pools (OpenAlex, Crossref).

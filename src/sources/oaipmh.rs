@@ -256,7 +256,7 @@ impl OaiPmhAdapter {
                 .and_then(|(_, tail)| tail.split('/').next())
                 .and_then(normalize_pmcid)
             {
-                record.push_identifier(IdentifierKind::Pmc, Some(pmcid));
+                record.push_identifier(IdentifierKind::Pmcid, Some(pmcid));
                 continue;
             }
             // The first plain https identifier becomes the landing page.
@@ -657,7 +657,7 @@ mod tests {
             .expect("PMC Text records are paper-like");
         assert_eq!(record.source_id, "pmc-oaipmh");
         assert_eq!(record.source_record_id, "oai:pubmedcentral.nih.gov:6718227");
-        assert_eq!(record.identifier(IdentifierKind::Pmc), Some("PMC6718227"));
+        assert_eq!(record.identifier(IdentifierKind::Pmcid), Some("PMC6718227"));
         assert_eq!(record.doi(), Some("10.1002/14651858.cd013413"));
         assert!(record.title.contains("tobacco"));
         assert_eq!(record.venue.as_deref(), Some("Cochrane Database Syst Rev"));

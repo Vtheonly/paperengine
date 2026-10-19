@@ -129,13 +129,15 @@ pub fn normalize_pmid(raw: &str) -> Option<String> {
     Some(stripped.to_owned())
 }
 
-/// Normalize a PubMed Central id. Accepts `PMC4302049` and the bare accession form
-/// `4302049`; both canonicalize to `PMC4302049`. Malformed inputs are rejected.
+/// Normalize a PubMed Central id (PMCID). Accepts `PMC4302049`, any case of the prefix
+/// (`pmc…`, `Pmc…`), and the bare accession form `4302049`; leading zeros are stripped.
+/// All forms canonicalize to `PMC4302049`. Malformed inputs are rejected.
 pub fn normalize_pmcid(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     let stripped = trimmed
         .strip_prefix("PMC")
         .or_else(|| trimmed.strip_prefix("pmc"))
+        .or_else(|| trimmed.strip_prefix("Pmc"))
         .unwrap_or(trimmed);
     if stripped.is_empty() || !stripped.chars().all(|c| c.is_ascii_digit()) {
         return None;
@@ -176,7 +178,7 @@ pub fn normalize_identifier(kind: IdentifierKind, raw: &str) -> Option<String> {
         IdentifierKind::Doi => normalize_doi(raw),
         IdentifierKind::Arxiv => normalize_arxiv_id(raw),
         IdentifierKind::Pmid => normalize_pmid(raw),
-        IdentifierKind::Pmc => normalize_pmcid(raw),
+        IdentifierKind::Pmcid => normalize_pmcid(raw),
         IdentifierKind::Openalex => normalize_openalex_id(raw),
         IdentifierKind::Crossref => {
             let doi = normalize_doi(raw)?;

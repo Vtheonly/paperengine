@@ -12,8 +12,9 @@ use paperengine::library::{
     run_acquisition, AcquisitionConfig, AcquisitionOutcome, AcquisitionReportEntry, LibraryLayout,
 };
 use paperengine::sources::arxiv::{ArxivAdapter, ArxivConfig};
+use paperengine::sources::europepmc::{EuropePmcAdapter, EuropePmcConfig};
 use paperengine::sources::openalex::{OpenAlexAdapter, OpenAlexConfig};
-use paperengine::sources::work_record::WorkRecord;
+use paperengine::sources::work_record::{IdentifierKind, WorkRecord};
 use paperengine::sources::{DiscoveryQuery, SourceAdapter, SourceError};
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -417,6 +418,125 @@ async fn arxiv_discovery_paginates_with_start_offsets() {
     );
     // A full page advertises a next cursor with the next start offset.
     assert_eq!(page.next_cursor.as_deref(), Some("1"));
+}
+
+fn europepmc_for(server: &FixtureServer) -> EuropePmcAdapter {
+    EuropePmcAdapter::new(EuropePmcConfig {
+        api_base: Some(server.base_url.clone()),
+        min_request_interval: Some(Duration::from_millis(0)),
+        ..EuropePmcConfig::default()
+    })
+    .unwrap()
+}
+
+fn epmc_page(next_cursor_mark: &str, id: &str, pmcid: Option<&str>) -> String {
+    serde_json::json!({
+        "hitCount": 42,
+        "nextCursorMark": next_cursor_mark,
+        "resultList": {
+            "result": [
+                {
+                    "id": id,
+                    "source": "MED",
+                    "pmcid": pmcid,
+                    "pmid": id,
+                    "doi": format!("10.1371/journal.pone.{id}"),
+                    "title": format!("Fixture record {id}"),
+                    "authorString": "Doe J., Roe A.,",
+                    "pubYear": "2024",
+                    "isOpenAccess": "Y",
+                    "inEPMC": "Y",
+                    "hasPDF": "Y",
+                    "license": "cc by",
+                    "pubTypeList": { "pubType": ["Journal Article"] },
+                    "journalInfo": { "journal": { "title": "PloS one" } },
+                    "fullTextUrlList": { "fullTextUrl": [
+                        {
+                            "availability": "Subscription required",
+                            "availabilityCode": "S",
+                            "documentStyle": "doi",
+                            "site": "DOI",
+                            "url": format!("https://doi.org/10.1371/journal.pone.{id}")
+                        },
+                        {
+                            "availability": "Open access",
+                            "availabilityCode": "OA",
+                            "documentStyle": "pdf",
+                            "site": "Europe_PMC",
+                            "url": format!("https://europepmc.org/articles/{}?pdf=render", pmcid.unwrap_or(""))
+                        }
+                    ]}
+                }
+            ]
+        }
+    })
+    .to_string()
+}
+
+#[tokio::test]
+async fn europepmc_discovery_uses_cursormark_pagination_over_http() {
+    let server = FixtureServer::start(vec![
+        Route::json("/search", epmc_page("cursor-two", "1", Some("PMC1111111"))),
+        Route::json("/search", epmc_page("cursor-two", "2", Some("PMC2222222"))),
+    ]);
+    let adapter = europepmc_for(&server);
+
+    let page = adapter
+        .discover(
+            &DiscoveryQuery {
+                text: "attention".into(),
+                page_size: 1,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.records.len(), 1);
+    assert_eq!(page.records[0].source_record_id, "MED/1");
+    assert_eq!(
+        page.records[0].identifier(IdentifierKind::Pmcid),
+        Some("PMC1111111")
+    );
+    assert_eq!(
+        page.records[0].oa_pdf_url.as_deref(),
+        Some("https://europepmc.org/articles/PMC1111111?pdf=render")
+    );
+    // A full page with a fresh cursor advertises the next cursorMark.
+    assert_eq!(page.next_cursor.as_deref(), Some("cursor-two"));
+
+    // Feeding the same cursor back stops the traversal: nextCursorMark did not advance.
+    let page = adapter
+        .discover(
+            &DiscoveryQuery {
+                text: "attention".into(),
+                page_size: 1,
+            },
+            page.next_cursor.as_deref(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.records[0].source_record_id, "MED/2");
+    assert_eq!(page.next_cursor, None);
+    assert_eq!(server.request_count(), 2);
+}
+
+#[tokio::test]
+async fn europepmc_doi_lookup_over_http_resolves_the_record() {
+    let server = FixtureServer::start(vec![Route::json(
+        "/search",
+        epmc_page("*", "17299599", Some("PMC1790633")),
+    )]);
+    let adapter = europepmc_for(&server);
+    let record = adapter
+        .lookup_doi("10.1371/journal.pone.0000219")
+        .await
+        .unwrap()
+        .expect("the DOI must resolve");
+    assert_eq!(record.source_id, "europepmc");
+    assert_eq!(record.source_record_id, "MED/17299599");
+    assert_eq!(record.doi(), Some("10.1371/journal.pone.17299599"));
+    assert_eq!(record.identifier(IdentifierKind::Pmcid), Some("PMC1790633"));
+    assert_eq!(record.license.as_deref(), Some("cc by"));
 }
 
 // ---------------------------------------------------------------------------

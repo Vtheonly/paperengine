@@ -130,6 +130,10 @@ here — it requires a real Colab runtime and remains outstanding live verificat
 - OpenAlex search could not be live-verified from this network (shared free-tier budget
   exhausted; HTTP 429). DOI lookup is live-verified; an API key is the documented
   unblocking step.
+- Europe PMC OA PDF acquisition is blocked from datacenter networks: the europepmc.org
+  website refuses the render URL with HTTP 403 (bot protection). The API at ebi.ac.uk is
+  live-verified for discovery and DOI lookup. Acquisition must be verified from an
+  unrestricted network or Colab; no bypass exists by policy.
 - Unpaywall-resolved PDF URLs were verified to resolve at the metadata level (L2);
   a Layer-3 download through a Unpaywall-resolved link was not separately recorded in
   this run — the acquisition path itself is source-agnostic and already exercised
@@ -231,3 +235,52 @@ Deployment-path verification repeated at this revision:
   twelve registered sources, live arXiv discovery, Unpaywall resolution, real
   acquisition of two PDFs (447,412 B / 21 pages and 2,215,244 B / 15 pages —
   the original "Attention Is All You Need"), library inspection, and report.
+
+## Fourth run — Europe PMC unification (final source commit pending push)
+
+Two independent Europe PMC implementations were reconciled (see the unification note
+below). The unified tree was re-verified end to end on 2026-10-19; the numbers below
+were re-measured on the final merged tree before the push.
+
+```bash
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 161 passed, 0 failed, 27 ignored (live, opt-in)
+cargo build --release               # pass
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources -- --ignored --nocapture --test-threads=1
+```
+
+Result on the merged tree: **27 passed, 0 failed**, including six real PDF
+acquisitions (arXiv 447,412 B; DOAJ 1,457,506 B; OpenAlex-resolved PLOS 703,571 B;
+OSF 408,201 B; Unpaywall-resolved PLOS 703,571 B; Zenodo 86,360 B), three OAI-PMH
+harvests with resumption tokens (DOAJ journals, PMC articles, Zenodo records), and
+the two honest BLOCKED states (Europe PMC render 403, OpenAlex search 429).
+
+New Europe PMC evidence in the unified tree:
+
+| Test | Observed result |
+|---|---|
+| `live_europepmc_discovery_returns_parseable_records_with_oa_pdf_links` | 5 records for `"high-throughput sequencing" AND OPEN_ACCESS:Y`; 4 with OA render links; first: `MED/42796766` "A Validation Study of a High-Throughput Sequencing Workflow for the Detection of Grapevine Viruses and Viroids." One record (`PMC/PMC13638646`, in-process manuscript) legitimately reports no `pubYear` and no PDF — parsed as `None`, not fabricated. |
+| `live_europepmc_doi_lookup_resolves_a_stable_doi` | `10.1371/journal.pone.0000219` → `MED/17299599`, PMCID `PMC1790633`, license `cc by`, OA render `https://europepmc.org/articles/PMC1790633?pdf=render` |
+| `live_europepmc_doi_lookup_resolves_the_deseq2_paper` | `10.1186/s13059-014-0550-8` (DESeq2) → `MED/25516281`, PMCID `PMC4302049`, OA render `https://europepmc.org/articles/PMC4302049?pdf=render` |
+| `live_europepmc_end_to_end_pdf_acquisition_or_blocked` | **BLOCKED (honest)**: `https://europepmc.org/articles/PMC13610249?pdf=render` refused with HTTP 403 by the europepmc.org website from this datacenter network; recorded as BLOCKED evidence, never retried past refusal or evaded. The metadata API (ebi.ac.uk) is fully live-verified. Run from an unrestricted network or Colab to complete L3. |
+
+Regression evidence from the same command on the merged tree: arXiv discovery and
+L3 acquisition reproduced byte-identically (447,412 B, 21 pages, SHA-256
+`f2441d3de469…bd94aeb`); Crossref, DOAJ, Zenodo, OSF, and Unpaywall tests all
+passed, with the DOAJ/OSF/Zenodo real acquisitions reproducing as well; PMC and
+OpenAlex DOI lookups passed; OpenAlex search remained 429-BLOCKED on the shared
+free-tier budget.
+
+### Europe PMC unification note
+
+Two independent implementations of the Europe PMC adapter were produced on
+2026-10-19: one metadata-only (its probe of the undocumented `ptpmcrender.fcgi` render
+form had answered 403) and one recording the API's own `fullTextUrlList` OA render
+links (`https://europepmc.org/articles/{pmcid}?pdf=render`, returned by the documented
+`resultType=core` search). They were unified on the second semantics — the source
+itself reports these URLs for OA records — with the conservative guarantees kept:
+lite responses without `fullTextUrlList` never fabricate a link, subscription entries
+never become PDFs, and the datacenter 403 refusal is recorded as BLOCKED evidence
+rather than retried or evaded. The identifier kind is unified as `pmcid`.

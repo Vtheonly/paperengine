@@ -15,7 +15,7 @@ pub enum IdentifierKind {
     Doi,
     Arxiv,
     Pmid,
-    Pmc,
+    Pmcid,
     Openalex,
     Crossref,
 }
@@ -26,7 +26,7 @@ impl IdentifierKind {
             IdentifierKind::Doi => "doi",
             IdentifierKind::Arxiv => "arxiv",
             IdentifierKind::Pmid => "pmid",
-            IdentifierKind::Pmc => "pmc",
+            IdentifierKind::Pmcid => "pmcid",
             IdentifierKind::Openalex => "openalex",
             IdentifierKind::Crossref => "crossref",
         }
@@ -65,6 +65,13 @@ pub const PAPER_LIKE_WORK_TYPES: &[&str] = &[
     "proceedings-article",
     "posted-content",
     "report-component",
+    // Europe PMC (canonicalized to lowercase-hyphen form by the adapter)
+    "review",
+    "comment",
+    "case-reports",
+    "meta-analysis",
+    "systematic-review",
+    "observational-study",
 ];
 
 /// How adapter results are filtered by work type. The engine default is paper-only

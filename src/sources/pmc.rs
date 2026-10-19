@@ -110,7 +110,7 @@ impl PmcAdapter {
         };
         let pmcid = field("pmcid").and_then(|value| normalize_pmcid(&value))?;
         let mut record = WorkRecord::new("pmc", pmcid.clone());
-        record.push_identifier(IdentifierKind::Pmc, Some(pmcid.clone()));
+        record.push_identifier(IdentifierKind::Pmcid, Some(pmcid.clone()));
         record.push_identifier(
             IdentifierKind::Doi,
             field("doi").as_deref().and_then(normalize_doi),
@@ -394,7 +394,10 @@ mod tests {
         let record = adapter.parse_summary(&result[uid]).unwrap();
         assert_eq!(record.source_id, "pmc");
         assert_eq!(record.source_record_id, "PMC13362148");
-        assert_eq!(record.identifier(IdentifierKind::Pmc), Some("PMC13362148"));
+        assert_eq!(
+            record.identifier(IdentifierKind::Pmcid),
+            Some("PMC13362148")
+        );
         assert_eq!(record.doi(), Some("10.1371/journal.pone.0353788"));
         assert_eq!(record.identifier(IdentifierKind::Pmid), Some("42441585"));
         assert_eq!(record.publication_year, Some(2026));

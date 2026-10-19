@@ -156,7 +156,6 @@ serialized execution is what actually honors each source's minimum interval.
   dedicated issue); incremental cross-run ingestion belongs to issue #9.
 
 ## Newly implemented and live-verified (issue #12, 2026-10-19)
-
 The five sources below were implemented in the second adapter wave and verified
 against their live endpoints on 2026-10-19. Their previous "not implemented"
 entries have been retired; the recorded access mechanisms turned out accurate.
@@ -164,26 +163,53 @@ entries have been retired; the recorded access mechanisms turned out accurate.
 ### Europe PMC
 
 - **Endpoint:** `https://www.ebi.ac.uk/europepmc/webservices/rest/search` (REST,
-  JSON; `page`/`pageSize`); JATS full text at `/rest/<PMCID>/fullTextXML`
-- **Adapter:** `src/sources/europepmc.rs` (contract version 1, adapter version 1)
-- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19
-- **Access basis:** public REST API; no key or account required.
-- **Capabilities:** discovery (`query=` search), DOI lookup via `DOI:"..."`
-  fielded search, paper-type filtering (articles and PPR preprints by default).
-- **Identifiers provided:** accession id, PMID, PMCID, DOI.
-- **Full text:** **no direct PDF.** The site's `ptpmcrender.fcgi` render link is
-  undocumented and answered 403 when probed (2026-10-19); availability flags
-  (`isOpenAccess`, `inEPMC`, `hasPDF`) are retained verbatim in `raw` and never
-  turned into a claimed PDF. Documented full-text form is JATS XML, reserved for
-  the extraction slice (#31).
+  JSON; documented `cursorMark`/`nextCursorMark` deep pagination,
+  `resultType=core`); JATS full text at `/rest/<PMCID>/fullTextXML` (reserved for
+  the extraction slice, #31)
+- **Adapter:** `src/sources/europepmc.rs` (contract version 1, adapter version 1;
+  unified merge of the two independent 2026-10-19 implementations)
+- **Status:** fixture-tested and live-verified (L1+L2) on 2026-10-19; the L3
+  acquisition attempt is **BLOCKED** from datacenter networks (see below)
+- **Access basis:** public REST API over PubMed and the PMC collections; no key or
+  account required. EBI asks clients to stay well below three requests per second.
+- **Capabilities:** discovery (free-text queries in Europe PMC's own syntax,
+  including the `OPEN_ACCESS:Y` filter), DOI lookup via documented `DOI:"…"`
+  fielded search, direct OA PDF links, and paper-type filtering (journal articles,
+  preprints including the `PPR` collection, reviews, case reports, clinical-trial
+  phases; errata and corrections excluded by default).
+- **Identifiers provided:** composite source/id record id (`MED/…`, `PMC/…`,
+  `PPR/…`), PMCID, PMID, DOI.
+- **Full text:** for OA records the API's `fullTextUrlList` reports a direct render
+  entry (`availabilityCode: "OA"` + `documentStyle: "pdf"` + `site: "Europe_PMC"`,
+  `https://europepmc.org/articles/{pmcid}?pdf=render`), which the adapter records
+  as `oa_pdf_url` exactly as reported. The render URLs are hosted on the
+  europepmc.org **website**, which applies bot protection: two independent probes
+  on 2026-10-19 (the `ptpmcrender.fcgi` form and the `?pdf=render` form) were both
+  refused with HTTP 403 from datacenter networks. The refusal is surfaced and
+  recorded as BLOCKED — never retried past or evaded. Acquisition from an
+  unrestricted network (e.g. Colab) is the documented way to complete Layer 3.
+  Subscription and free-while-subscribed entries never become PDF links.
 - **Rate policy:** >=1 s between requests.
-- **Tests:** fixture tests in `src/sources/europepmc.rs` (`europepmc_search.json`);
-  live tests `live_europepmc_discovery_returns_metadata_without_pdf_links` and
-  `live_europepmc_doi_lookup_resolves_the_deseq2_paper`.
-- **Last live result (2026-10-19):** discovery returned 3 records for "DESeq2";
-  DOI lookup resolved `10.1186/s13059-014-0550-8` to PMID 25516281 / PMC4302049
-  with no PDF claim.
-- **Limitations / next step:** JATS XML ingestion (#31); no reference expansion.
+- **Tests:** fixture tests in `src/sources/europepmc.rs` (recorded core response
+  `epmc_search.json` with mixed OA/non-OA records and an erratum, recorded DOI
+  lookup `epmc_doi.json`, recorded lite response `europepmc_search.json` proving
+  no PDF link is fabricated when `fullTextUrlList` is absent); over-the-wire
+  cursor-pagination and DOI-lookup tests in `tests/source_pipeline_tests.rs`;
+  live tests `live_europepmc_discovery_returns_parseable_records_with_oa_pdf_links`,
+  `live_europepmc_doi_lookup_resolves_a_stable_doi`,
+  `live_europepmc_doi_lookup_resolves_the_deseq2_paper`, and
+  `live_europepmc_end_to_end_pdf_acquisition_or_blocked` in `tests/live_sources.rs`.
+- **Last live result (2026-10-19):** discovery for
+  `"high-throughput sequencing" AND OPEN_ACCESS:Y` returned 5 records, 4 with OA
+  render links (first: `MED/42796766`); DOI lookups resolved
+  `10.1371/journal.pone.0000219` to `MED/17299599` / PMC1790633 (cc by) and
+  `10.1186/s13059-014-0550-8` (DESeq2) to `MED/25516281` / PMC4302049. The
+  end-to-end acquisition of
+  `https://europepmc.org/articles/PMC13610249?pdf=render` was refused with HTTP
+  403 by the europepmc.org website from this datacenter network — recorded as
+  BLOCKED with evidence, not retried or evaded.
+- **Limitations / next step:** JATS XML ingestion (#31); no reference expansion;
+  no incremental sync; no datacenter-403 workaround exists by policy.
 
 ### PubMed Central (NCBI)
 

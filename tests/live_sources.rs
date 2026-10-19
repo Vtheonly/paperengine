@@ -18,14 +18,17 @@
 //! ```
 //!
 //! To additionally exercise a real PDF acquisition (Layer 3), set
-//! `PAPERENGINE_LIVE_ACQUIRE=1`; it downloads exactly one small open-access paper from
-//! arXiv through the production pipeline.
+//! `PAPERENGINE_LIVE_ACQUIRE=1`; it downloads exactly one small open-access paper per
+//! acquiring source (arXiv PDF; Europe PMC OA-subset render, which may be 403-blocked on
+//! datacenter networks — the test then records BLOCKED evidence instead of a failure)
+//! through the production pipeline.
 
 use paperengine::library::{
     run_acquisition, AcquisitionConfig, AcquisitionOutcome, AcquisitionReportEntry, LibraryLayout,
 };
 use paperengine::sources::arxiv::{ArxivAdapter, ArxivConfig};
 use paperengine::sources::crossref::{CrossrefAdapter, CrossrefConfig};
+use paperengine::sources::europepmc::{EuropePmcAdapter, EuropePmcConfig};
 use paperengine::sources::openalex::{OpenAlexAdapter, OpenAlexConfig};
 use paperengine::sources::unpaywall::{UnpaywallAdapter, UnpaywallConfig};
 use paperengine::sources::{DiscoveryQuery, SourceAdapter, SourceError};
@@ -336,6 +339,193 @@ async fn live_openalex_doi_lookup_resolves_a_work() {
 
 #[tokio::test]
 #[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_europepmc_discovery_returns_parseable_records_with_oa_pdf_links() {
+    if !live_tests_enabled() {
+        return;
+    }
+    let adapter = EuropePmcAdapter::new(EuropePmcConfig::default()).unwrap();
+    let page = adapter
+        .discover(
+            &DiscoveryQuery {
+                // OPEN_ACCESS:Y is Europe PMC's own documented query filter for the OA
+                // subset, so every returned record is expected to carry an OA PDF link.
+                text: "high-throughput sequencing AND OPEN_ACCESS:Y".into(),
+                page_size: 5,
+            },
+            None,
+        )
+        .await
+        .expect("Europe PMC API should be reachable");
+    assert!(!page.records.is_empty(), "Europe PMC should return records");
+    let with_pdf = page
+        .records
+        .iter()
+        .filter(|record| record.oa_pdf_url.is_some())
+        .count();
+    assert!(
+        with_pdf > 0,
+        "OA-subset discovery must expose OA PDF links, got {} records",
+        page.records.len()
+    );
+    let mut records_with_year = 0;
+    for record in &page.records {
+        assert!(record.source_record_id.contains('/'));
+        if let Some(pdf) = record.oa_pdf_url.as_deref() {
+            assert!(pdf.starts_with("https://europepmc.org/articles/PMC"));
+            assert!(pdf.ends_with("?pdf=render"));
+        }
+        if record.publication_year.is_some() {
+            records_with_year += 1;
+        }
+        assert!(!record.title.is_empty());
+    }
+    // Some live OA records (observed: PMC in-process manuscripts) legitimately report no
+    // pubYear; the parser maps that to None. The overwhelming majority must carry a year.
+    assert!(
+        records_with_year > 0,
+        "expected at least one record with a publication year"
+    );
+    eprintln!(
+        "Europe PMC discovery OK: {} records, {with_pdf} with OA PDF links, first {} ({})",
+        page.records.len(),
+        page.records[0].source_record_id,
+        page.records[0].title
+    );
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
+async fn live_europepmc_doi_lookup_resolves_a_stable_doi() {
+    if !live_tests_enabled() {
+        return;
+    }
+    let adapter = EuropePmcAdapter::new(EuropePmcConfig::default()).unwrap();
+    // PLOS ONE fully open-access article, stable since 2007.
+    let record = adapter
+        .lookup_doi("10.1371/journal.pone.0000219")
+        .await
+        .expect("Europe PMC lookup should succeed")
+        .expect("the DOI must resolve");
+    assert_eq!(record.source_record_id, "MED/17299599");
+    assert_eq!(
+        record.identifier(paperengine::sources::IdentifierKind::Pmcid),
+        Some("PMC1790633")
+    );
+    assert_eq!(record.license.as_deref(), Some("cc by"));
+    assert!(record
+        .oa_pdf_url
+        .as_deref()
+        .is_some_and(|url| url.starts_with("https://europepmc.org/articles/PMC1790633")));
+    eprintln!(
+        "Europe PMC DOI lookup OK: {} -> {}",
+        record.title,
+        record.oa_pdf_url.as_deref().unwrap_or("<none>")
+    );
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and PAPERENGINE_LIVE_ACQUIRE=1 to download"]
+async fn live_europepmc_end_to_end_pdf_acquisition_or_blocked() {
+    if !live_tests_enabled() || !live_acquire_enabled() {
+        return;
+    }
+    let adapter = EuropePmcAdapter::new(EuropePmcConfig::default()).unwrap();
+    let page = adapter
+        .discover(
+            &DiscoveryQuery {
+                text: "high-throughput sequencing AND OPEN_ACCESS:Y".into(),
+                page_size: 5,
+            },
+            None,
+        )
+        .await
+        .expect("Europe PMC API should be reachable");
+    let record = page
+        .records
+        .iter()
+        .find(|record| record.oa_pdf_url.is_some())
+        .expect("OA-subset discovery must expose OA PDF links");
+
+    let directory = tempfile::tempdir().unwrap();
+    let library = LibraryLayout::new(directory.path().join("library"));
+    let config = AcquisitionConfig {
+        max_downloads: 1,
+        min_bytes_per_file: 1024,
+        max_bytes_per_file: 8 * 1024 * 1024,
+        max_total_bytes: 8 * 1024 * 1024,
+        request_timeout: Duration::from_secs(60),
+        total_timeout: Duration::from_secs(180),
+        inter_download_delay: Duration::from_secs(0),
+        allow_http: false,
+    };
+    let downloader =
+        paperengine::library::acquisition_downloader(&config).expect("downloader builds");
+
+    let mut entries = Vec::new();
+    let summary = run_acquisition(
+        std::iter::once(record),
+        &library,
+        &config,
+        &downloader,
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        |entry: &AcquisitionReportEntry| {
+            entries.push(serde_json::to_string(entry).unwrap());
+            Ok(())
+        },
+    )
+    .await
+    .expect("acquisition pipeline should run");
+
+    let entry: AcquisitionReportEntry = serde_json::from_str(&entries[0]).unwrap();
+    match &entry.outcome {
+        AcquisitionOutcome::Acquired {
+            byte_length,
+            sha256_hex,
+            page_count,
+            object_path,
+            ..
+        } => {
+            assert_eq!(summary.acquired, 1);
+            assert!(*byte_length > 0);
+            assert!(*page_count > 0);
+            assert_eq!(sha256_hex.len(), 64);
+            eprintln!(
+                "EPMC ACQUISITION EVIDENCE: id={} url={} bytes={} sha256={} pages={} object={}",
+                record.source_record_id,
+                record.oa_pdf_url.as_deref().unwrap_or("<none>"),
+                byte_length,
+                sha256_hex,
+                page_count,
+                object_path
+            );
+            let manifests = library.list_manifests().unwrap();
+            assert_eq!(manifests.len(), 1);
+            assert_eq!(manifests[0].work.source_id, "europepmc");
+        }
+        AcquisitionOutcome::Failed { stage, detail } if detail.contains("403") => {
+            // The europepmc.org website applies bot protection that rejects datacenter
+            // clients with HTTP 403. This is a source-side access restriction recorded as
+            // BLOCKED evidence — the engine never retries past it or tries to evade it.
+            // The metadata API itself remains verified by the discovery/lookup tests.
+            assert_eq!(summary.acquired, 0);
+            eprintln!(
+                "EPMC ACQUISITION BLOCKED: europepmc.org refused the PDF transfer (403) for {} \
+                 from this network (stage: {stage}); run from an unrestricted network or Colab \
+                 to verify",
+                record.oa_pdf_url.as_deref().unwrap_or("<none>")
+            );
+        }
+        other => panic!(
+            "unexpected acquisition outcome for Europe PMC: {other:?} (summary: {summary:?})"
+        ),
+    }
+}
+
+#[tokio::test]
+#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
 async fn live_openalex_discovery_or_blocked_by_free_tier_budget() {
     if !live_tests_enabled() {
         return;
@@ -382,7 +572,6 @@ async fn live_openalex_discovery_or_blocked_by_free_tier_budget() {
 // ---------------------------------------------------------------------------
 
 use paperengine::sources::doaj::{DoajAdapter, DoajConfig};
-use paperengine::sources::europepmc::{EuropePmcAdapter, EuropePmcConfig};
 use paperengine::sources::osf::{OsfAdapter, OsfConfig};
 use paperengine::sources::pmc::{PmcAdapter, PmcConfig};
 use paperengine::sources::zenodo::{ZenodoAdapter, ZenodoConfig};
@@ -467,41 +656,6 @@ async fn acquire_one_real_pdf(record: &paperengine::sources::WorkRecord, source_
 
 #[tokio::test]
 #[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
-async fn live_europepmc_discovery_returns_metadata_without_pdf_links() {
-    if !live_tests_enabled() {
-        return;
-    }
-    let adapter = EuropePmcAdapter::new(EuropePmcConfig::default()).unwrap();
-    let page = adapter
-        .discover(
-            &DiscoveryQuery {
-                text: "DESeq2".into(),
-                page_size: 3,
-            },
-            None,
-        )
-        .await
-        .expect("Europe PMC API should be reachable");
-    assert!(!page.records.is_empty(), "Europe PMC should return records");
-    for record in &page.records {
-        assert!(!record.title.is_empty());
-        // Europe PMC has no documented public PDF endpoint; it must never claim one.
-        assert!(record.oa_pdf_url.is_none(), "record {record:?}");
-    }
-    let first = &page.records[0];
-    assert!(first
-        .identifier(paperengine::sources::IdentifierKind::Pmc)
-        .is_some());
-    eprintln!(
-        "Europe PMC discovery OK: {} records, first {} ({})",
-        page.records.len(),
-        first.source_record_id,
-        first.title
-    );
-}
-
-#[tokio::test]
-#[ignore = "live test: set PAPERENGINE_LIVE_TESTS=1 and run with --ignored"]
 async fn live_europepmc_doi_lookup_resolves_the_deseq2_paper() {
     if !live_tests_enabled() {
         return;
@@ -512,13 +666,25 @@ async fn live_europepmc_doi_lookup_resolves_the_deseq2_paper() {
         .await
         .expect("Europe PMC lookup should succeed")
         .expect("the DOI must resolve");
-    assert_eq!(record.source_record_id, "25516281");
+    assert_eq!(record.source_record_id, "MED/25516281");
     assert_eq!(
-        record.identifier(paperengine::sources::IdentifierKind::Pmc),
+        record.identifier(paperengine::sources::IdentifierKind::Pmcid),
         Some("PMC4302049")
     );
     assert!(record.title.contains("DESeq2"));
-    eprintln!("Europe PMC DOI lookup OK: {}", record.title);
+    // The DESeq2 paper is in the OA subset: the API-reported render link must be
+    // recorded, exactly as the source reports it.
+    if record.raw["isOpenAccess"].as_str() == Some("Y") {
+        assert!(record
+            .oa_pdf_url
+            .as_deref()
+            .is_some_and(|url| url.starts_with("https://europepmc.org/articles/PMC")));
+    }
+    eprintln!(
+        "Europe PMC DOI lookup OK: {} -> {}",
+        record.title,
+        record.oa_pdf_url.as_deref().unwrap_or("<no render link>")
+    );
 }
 
 // --- PubMed Central --------------------------------------------------------
@@ -543,7 +709,7 @@ async fn live_pmc_discovery_returns_metadata_without_pdf_links() {
     assert!(!page.records.is_empty(), "PMC should return records");
     for record in &page.records {
         assert!(record
-            .identifier(paperengine::sources::IdentifierKind::Pmc)
+            .identifier(paperengine::sources::IdentifierKind::Pmcid)
             .is_some());
         assert!(record.oa_pdf_url.is_none(), "PMC must never claim a PDF");
         assert!(!record.title.is_empty());

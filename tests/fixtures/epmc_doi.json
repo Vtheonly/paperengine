@@ -1,0 +1,369 @@
+{
+ "version": "6.9",
+ "hitCount": 1,
+ "request": {
+  "queryString": "DOI:\"10.1371/journal.pone.0000219\"",
+  "resultType": "core",
+  "cursorMark": "*",
+  "pageSize": 25,
+  "sort": "",
+  "synonym": false
+ },
+ "resultList": {
+  "result": [
+   {
+    "id": "17299599",
+    "source": "MED",
+    "pmid": "17299599",
+    "pmcid": "PMC1790633",
+    "fullTextIdList": {
+     "fullTextId": [
+      "PMC1790633"
+     ]
+    },
+    "doi": "10.1371/journal.pone.0000219",
+    "title": "High-throughput sequencing of Arabidopsis microRNAs: evidence for frequent birth and death of MIRNA genes.",
+    "authorString": "Fahlgren N, Howell MD, Kasschau KD, Chapman EJ, Sullivan CM, Cumbie JS, Givan SA, Law TF, Grant SR, Dangl JL, Carrington JC.",
+    "authorList": {
+     "author": [
+      {
+       "fullName": "Fahlgren N",
+       "lastName": "Fahlgren",
+       "firstName": "Noah",
+       "initials": "N",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0002-5597-4537"
+       },
+       "authorAffiliationDetailsList": {
+        "authorAffiliation": [
+         {
+          "affiliation": "Center for Genome Research and Biocomputing, Department of Botany and Plant Pathology, Oregon State University, Corvallis, Oregon, United States of America."
+         }
+        ]
+       }
+      },
+      {
+       "fullName": "Howell MD",
+       "lastName": "Howell",
+       "firstName": "Miya D",
+       "initials": "MD"
+      },
+      {
+       "fullName": "Kasschau KD",
+       "lastName": "Kasschau",
+       "firstName": "Kristin D",
+       "initials": "KD"
+      },
+      {
+       "fullName": "Chapman EJ",
+       "lastName": "Chapman",
+       "firstName": "Elisabeth J",
+       "initials": "EJ"
+      },
+      {
+       "fullName": "Sullivan CM",
+       "lastName": "Sullivan",
+       "firstName": "Christopher M",
+       "initials": "CM"
+      },
+      {
+       "fullName": "Cumbie JS",
+       "lastName": "Cumbie",
+       "firstName": "Jason S",
+       "initials": "JS"
+      },
+      {
+       "fullName": "Givan SA",
+       "lastName": "Givan",
+       "firstName": "Scott A",
+       "initials": "SA",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0002-0630-8589"
+       }
+      },
+      {
+       "fullName": "Law TF",
+       "lastName": "Law",
+       "firstName": "Theresa F",
+       "initials": "TF"
+      },
+      {
+       "fullName": "Grant SR",
+       "lastName": "Grant",
+       "firstName": "Sarah R",
+       "initials": "SR"
+      },
+      {
+       "fullName": "Dangl JL",
+       "lastName": "Dangl",
+       "firstName": "Jeffery L",
+       "initials": "JL"
+      },
+      {
+       "fullName": "Carrington JC",
+       "lastName": "Carrington",
+       "firstName": "James C",
+       "initials": "JC",
+       "authorId": {
+        "type": "ORCID",
+        "value": "0000-0003-3572-129X"
+       }
+      }
+     ]
+    },
+    "authorIdList": {
+     "authorId": [
+      {
+       "type": "ORCID",
+       "value": "0000-0002-0630-8589"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0002-5597-4537"
+      },
+      {
+       "type": "ORCID",
+       "value": "0000-0003-3572-129X"
+      }
+     ]
+    },
+    "dataLinksTagsList": {
+     "dataLinkstag": [
+      "altmetrics",
+      "supporting_data",
+      "recommended_reviews",
+      "related_data"
+     ]
+    },
+    "journalInfo": {
+     "issue": "2",
+     "volume": "2",
+     "journalIssueId": 2465312,
+     "dateOfPublication": "2007 Feb",
+     "monthOfPublication": 2,
+     "yearOfPublication": 2007,
+     "journal": {
+      "medlineAbbreviation": "PLoS One",
+      "title": "PloS one",
+      "essn": "1932-6203",
+      "issn": "1932-6203",
+      "isoabbreviation": "PLoS One",
+      "nlmid": "101285081"
+     },
+     "printPublicationDate": "2007-02-01"
+    },
+    "pubYear": "2007",
+    "pageInfo": "e219",
+    "abstractText": "In plants, microRNAs (miRNAs) comprise one of two classes of small RNAs that function primarily as negative regulators at the posttranscriptional level. Several MIRNA genes in the plant kingdom are ancient, with conservation extending between angiosperms and the mosses, whereas many others are more recently evolved. Here, we use deep sequencing and computational methods to identify, profile and analyze non-conserved MIRNA genes in Arabidopsis thaliana. 48 non-conserved MIRNA families, nearly all of which were represented by single genes, were identified. Sequence similarity analyses of miRNA precursor foldback arms revealed evidence for recent evolutionary origin of 16 MIRNA loci through inverted duplication events from protein-coding gene sequences. Interestingly, these recently evolved MIRNA genes have taken distinct paths. Whereas some non-conserved miRNAs interact with and regulate target transcripts from gene families that donated parental sequences, others have drifted to the point of non-interaction with parental gene family transcripts. Some young MIRNA loci clearly originated from one gene family but form miRNAs that target transcripts in another family. We suggest that MIRNA genes are undergoing relatively frequent birth and death, with only a subset being stabilized by integration into regulatory networks.",
+    "affiliation": "Center for Genome Research and Biocomputing, Department of Botany and Plant Pathology, Oregon State University, Corvallis, Oregon, United States of America.",
+    "publicationStatus": "epublish",
+    "language": "eng",
+    "pubModel": "Electronic",
+    "pubTypeList": {
+     "pubType": [
+      "research-article",
+      "Research Support, U.S. Gov't, Non-P.H.S.",
+      "Journal Article",
+      "Research Support, N.I.H., Extramural"
+     ]
+    },
+    "grantsList": {
+     "grant": [
+      {
+       "agency": "NIAID NIH HHS",
+       "acronym": "AI",
+       "grantId": "R37 AI043288",
+       "orderIn": 0
+      },
+      {
+       "agency": "NIAID NIH HHS",
+       "acronym": "AI",
+       "grantId": "AI43288",
+       "orderIn": 0
+      },
+      {
+       "agency": "NIAID NIH HHS",
+       "acronym": "AI",
+       "grantId": "R01 AI043288",
+       "orderIn": 0
+      },
+      {
+       "agency": "NIAID NIH HHS",
+       "acronym": "AI",
+       "grantId": "R21 AI043288",
+       "orderIn": 0
+      }
+     ]
+    },
+    "meshHeadingList": {
+     "meshHeading": [
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Arabidopsis",
+       "meshQualifierList": {
+        "meshQualifier": [
+         {
+          "majorTopic_YN": "Y",
+          "abbreviation": "GE",
+          "qualifierName": "genetics"
+         }
+        ]
+       }
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "MicroRNAs",
+       "meshQualifierList": {
+        "meshQualifier": [
+         {
+          "majorTopic_YN": "N",
+          "abbreviation": "AN",
+          "qualifierName": "analysis"
+         },
+         {
+          "majorTopic_YN": "Y",
+          "abbreviation": "GE",
+          "qualifierName": "genetics"
+         }
+        ]
+       }
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "RNA, Plant",
+       "meshQualifierList": {
+        "meshQualifier": [
+         {
+          "majorTopic_YN": "N",
+          "abbreviation": "AN",
+          "qualifierName": "analysis"
+         },
+         {
+          "majorTopic_YN": "Y",
+          "abbreviation": "GE",
+          "qualifierName": "genetics"
+         }
+        ]
+       }
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Sequence Alignment"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Sequence Analysis, RNA"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Base Sequence"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Conserved Sequence"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Sequence Homology, Nucleic Acid"
+      },
+      {
+       "majorTopic_YN": "Y",
+       "descriptorName": "Genes, Plant"
+      },
+      {
+       "majorTopic_YN": "N",
+       "descriptorName": "Molecular Sequence Data"
+      },
+      {
+       "majorTopic_YN": "Y",
+       "descriptorName": "High-Throughput Screening Assays"
+      }
+     ]
+    },
+    "chemicalList": {
+     "chemical": [
+      {
+       "name": "RNA, Plant",
+       "registryNumber": "0"
+      },
+      {
+       "name": "MicroRNAs",
+       "registryNumber": "0"
+      }
+     ]
+    },
+    "subsetList": {
+     "subset": [
+      {
+       "code": "IM",
+       "name": "Index Medicus"
+      }
+     ]
+    },
+    "fullTextUrlList": {
+     "fullTextUrl": [
+      {
+       "availability": "Subscription required",
+       "availabilityCode": "S",
+       "documentStyle": "doi",
+       "site": "DOI",
+       "url": "https://doi.org/10.1371/journal.pone.0000219"
+      },
+      {
+       "availability": "Open access",
+       "availabilityCode": "OA",
+       "documentStyle": "html",
+       "site": "Europe_PMC",
+       "url": "https://europepmc.org/articles/PMC1790633"
+      },
+      {
+       "availability": "Open access",
+       "availabilityCode": "OA",
+       "documentStyle": "pdf",
+       "site": "Europe_PMC",
+       "url": "https://europepmc.org/articles/PMC1790633?pdf=render"
+      }
+     ]
+    },
+    "isOpenAccess": "Y",
+    "inEPMC": "Y",
+    "inPMC": "Y",
+    "citedByCount": 866,
+    "hasReferences": "Y",
+    "hasTextMinedTerms": "Y",
+    "hasDbCrossReferences": "Y",
+    "dbCrossReferenceList": {
+     "dbName": [
+      "ARXPR",
+      "EMBL"
+     ]
+    },
+    "hasPDF": "Y",
+    "hasBook": "N",
+    "hasSuppl": "Y",
+    "hasLabsLinks": "Y",
+    "hasData": "Y",
+    "license": "cc by",
+    "authMan": "N",
+    "epmcAuthMan": "N",
+    "nihAuthMan": "N",
+    "hasTMAccessionNumbers": "Y",
+    "tmAccessionTypeList": {
+     "accessionType": [
+      "geo"
+     ]
+    },
+    "dateOfCompletion": "2010-03-26",
+    "dateOfCreation": "2007-02-15",
+    "dateOfRevision": "2022-04-09",
+    "electronicPublicationDate": "2007-02-14",
+    "firstPublicationDate": "2007-02-14",
+    "firstIndexDate": "2010-03-27",
+    "fullTextReceivedDate": "2025-02-02",
+    "hasEvaluations": "N"
+   }
+  ]
+ }
+}

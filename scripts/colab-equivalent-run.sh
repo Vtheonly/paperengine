@@ -69,6 +69,18 @@ echo "== [cell 5b] Unpaywall DOI resolution =="
 ./target/release/paperengine lookup --source unpaywall \
     --doi 10.1371/journal.pone.0000219
 
+echo "== [cell 5c] Europe PMC discovery (OA subset, metadata only) =="
+# Europe PMC's API (ebi.ac.uk) serves metadata from any network; the OA render PDFs on
+# europepmc.org may be 403-blocked on datacenter IPs, so this step stays metadata-only.
+./target/release/paperengine discover \
+    --source europepmc \
+    --query '"high-throughput sequencing" AND OPEN_ACCESS:Y' \
+    --max-records 3 \
+    --out epmc-discovery.jsonl
+echo "europepmc records: $(wc -l < epmc-discovery.jsonl)"
+./target/release/paperengine lookup --source europepmc \
+    --doi 10.1371/journal.pone.0000219
+
 echo "== [cell 6] real acquisition (bounded) =="
 acquire_once() {
   ./target/release/paperengine acquire \

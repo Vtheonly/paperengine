@@ -18,11 +18,11 @@ Implemented now:
 - A bounded HTTP(S) downloader with validator-guarded resumption, early PDF magic-byte rejection, incremental BLAKE3/SHA-256 digests, size limits, and no-clobber publication.
 - Structural PDF validation and quarantine (lopdf): signature, EOF, length, MIME, checksum, page-tree, catalog, and encryption checks, with redacted quarantine manifests.
 - A **versioned source-adapter contract** with typed error taxonomy (403/429 are stop conditions, never challenges), per-source rate policies with request pacing, and a registry that refuses incompatible plugins.
-- **Source adapters** using documented public APIs: OpenAlex, arXiv, Crossref, and Unpaywall. Crossref is metadata-only by design; OpenAlex/Unpaywall resolve open-access locations; arXiv provides direct OA PDFs.
-- Identifier normalization for DOI, arXiv (modern + legacy), and PMID with equivalent-form tests.
+- **Source adapters** using documented public APIs: OpenAlex, arXiv, Crossref, Unpaywall, and Europe PMC. Crossref is metadata-only by design; OpenAlex/Unpaywall resolve open-access locations; arXiv provides direct OA PDFs; Europe PMC adds `cursorMark` pagination, PMCID identifiers, and OA-subset PDF render links.
+- Identifier normalization for DOI, arXiv (modern + legacy), PMID, and PMCID with equivalent-form tests.
 - A bounded, download-free **discovery runner** and a CLI: `discover`, `lookup`, `acquire`, `inspect`, `self-test`, and `rank`.
 - **Content-addressed storage**: `objects/<sha256[0..2]>/<sha256>.pdf` published by atomic rename, provenance manifests, per-run JSONL acquisition reports, dedup, and a pre-request URL policy gate (scheme, credentials, host).
-- Offline integration tests over a local HTTP fixture server, plus opt-in bounded live tests against the real APIs — including a real arXiv PDF acquisition through the production pipeline.
+- Offline integration tests over a local HTTP fixture server, plus opt-in bounded live tests against the real APIs — including real PDF acquisitions through the production pipeline (arXiv verified; Europe PMC acquisition is 403-blocked on datacenter networks and records BLOCKED evidence).
 - Validated configuration file (`paperengine.toml`) with unknown-key rejection and actionable budget errors.
 - GitHub Actions formatting, Clippy, test, and release-build checks; a separate manually-triggered live-test workflow.
 
@@ -38,15 +38,14 @@ Twelve adapters (nine REST + three OAI-PMH instances) are implemented behind the
 | arXiv | yes (Atom API) | – | yes (`/abs/…` → `/pdf/…`) | live + end-to-end acquisition |
 | Crossref | yes (polite pool) | yes | never (metadata only) | live |
 | Unpaywall | – | yes | yes (`url_for_pdf`) | live |
-| Europe PMC | yes (REST search) | yes | never — no documented public PDF endpoint; JATS XML only | live |
+| Europe PMC | yes (REST search, `cursorMark` pagination) | yes | yes — API-reported OA render links (`europepmc.org/articles/…?pdf=render`); the website may 403 datacenter IPs (recorded, never bypassed) | live; acquisition BLOCKED on datacenter networks, pending unrestricted-network verification |
 | PubMed Central | yes (E-utilities) | yes (`[PID]` exact match) | never — OA bulk utility observed 404 | live |
 | DOAJ | yes (application API) | yes | yes (publisher-deposited `content_type=pdf` links) | live + end-to-end acquisition |
 | Zenodo | yes (records API) | yes | yes (first `.pdf` file of publication records) | live + end-to-end acquisition |
 | OSF Preprints | yes (JSON:API, `filter[title]`) | – | yes (resolved `primary_file` downloads) | live + end-to-end acquisition |
 | OAI-PMH (Zenodo, DOAJ, PMC) | yes (`ListRecords` + `from` windows) | – | never — Dublin Core carries no full-text URLs | live |
 
-The opt-in live suite (`PAPERENGINE_LIVE_TESTS=1`, plus `PAPERENGINE_LIVE_ACQUIRE=1` for real downloads) exercises every adapter against its real endpoint — 19/19 passed on 2026-10-19 — and runs one real PDF acquisition per PDF-capable source (arXiv, DOAJ, OSF, Zenodo) through the production pipeline. See `tests/live_sources.rs` and [docs/SOURCE_COVERAGE.md](docs/SOURCE_COVERAGE.md) for the per-source registry with dates, blockers, and honest capability statements.
-
+The opt-in live suite (`PAPERENGINE_LIVE_TESTS=1`, plus `PAPERENGINE_LIVE_ACQUIRE=1` for real downloads) exercises every adapter against its real endpoint — all tests passed on 2026-10-19, including one real PDF acquisition per PDF-capable source with a verified path (arXiv, DOAJ, OSF, Zenodo) and an honestly recorded BLOCKED state for the Europe PMC render URL on datacenter networks. See `tests/live_sources.rs` and [docs/SOURCE_COVERAGE.md](docs/SOURCE_COVERAGE.md) for the per-source registry with dates, blockers, and honest capability statements.
 ## Quick start (Linux)
 
 No cloud account, hosted database, or paid service is required.
@@ -78,7 +77,7 @@ rejected. The e-mail can also be passed with `--email` or `PAPERENGINE_CONTACT_E
     --max-records 5 --out discovery.jsonl
 ```
 
-Sources: `arxiv`, `openalex`, `crossref`. Discovery writes one normalized JSONL record
+Sources: `arxiv`, `openalex`, `crossref`, `europepmc`. Discovery writes one normalized JSONL record
 per work and structurally never downloads payload bytes.
 
 ### Resolve an open-access location for a DOI
@@ -200,6 +199,19 @@ GitHub Actions runs these checks on pushes to `main` and pull requests, plus a
 manually-triggered live-source workflow. Recorded verification evidence — including a
 real end-to-end arXiv PDF acquisition with byte counts, SHA-256 hashes, and storage
 paths — is in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
+## Sources
+
+Built-in adapters (see `paperengine self-test` for a live capability report and
+[docs/SOURCE_COVERAGE.md](docs/SOURCE_COVERAGE.md) for the per-source verification registry):
+
+| Source | Discovery | DOI lookup | Direct OA PDFs | Notes |
+|---|---|---|---|---|
+| OpenAlex | yes | yes | no | metadata; optional API key; 429 free-tier budgets are stop conditions |
+| Crossref | yes | yes | no | metadata only; polite pool via `--email` |
+| Unpaywall | no | yes | yes | resolves Crossref DOIs to OA locations; requires `--email` |
+| arXiv | yes | no | yes | Atom API; 3-second courtesy spacing; live-verified acquisition |
+| Europe PMC | yes | yes | yes | REST API with `cursorMark` pagination; OA-subset PDF render URLs, which the europepmc.org website may serve 403 to datacenter IPs — recorded, never bypassed |
 
 ## Repository workflow
 

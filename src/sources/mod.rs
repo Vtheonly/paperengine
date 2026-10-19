@@ -180,6 +180,7 @@ mod tests {
         let (registry, notes) = builtin_registry(&BuiltinSourcesConfig::default());
         assert!(registry.get("openalex").is_some());
         assert!(registry.get("arxiv").is_some());
+        assert!(registry.get("europepmc").is_some());
         assert!(registry.get("crossref").is_some());
         assert!(registry.get("unpaywall").is_none());
         assert!(notes.iter().any(|note| note.contains("unpaywall skipped")));
