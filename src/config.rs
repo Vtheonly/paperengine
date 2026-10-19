@@ -5,6 +5,7 @@
 //! engine touches the network. CLI flags override file values; the contact e-mail can also
 //! come from `PAPERENGINE_CONTACT_EMAIL`.
 
+use crate::extract::ExtractionConfig;
 use crate::library::AcquisitionConfig;
 use crate::sources::BuiltinSourcesConfig;
 use serde::Deserialize;
@@ -38,6 +39,8 @@ pub struct PaperEngineConfig {
     pub discovery: DiscoverySettings,
     #[serde(default)]
     pub acquisition: AcquisitionSettings,
+    #[serde(default)]
+    pub extraction: ExtractionSettings,
 }
 
 impl Default for PaperEngineConfig {
@@ -48,6 +51,7 @@ impl Default for PaperEngineConfig {
             openalex_api_key: None,
             discovery: DiscoverySettings::default(),
             acquisition: AcquisitionSettings::default(),
+            extraction: ExtractionSettings::default(),
         }
     }
 }
@@ -94,6 +98,25 @@ impl Default for AcquisitionSettings {
             total_timeout_seconds: 600,
             inter_download_delay_seconds: 1,
             allow_http: false,
+        }
+    }
+}
+
+/// Budgets for the extraction stage (#31).
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ExtractionSettings {
+    /// Maximum extracted text bytes persisted per object.
+    pub max_text_bytes: u64,
+    /// Maximum objects processed per extraction run.
+    pub max_objects: usize,
+}
+
+impl Default for ExtractionSettings {
+    fn default() -> Self {
+        Self {
+            max_text_bytes: 16 * 1024 * 1024,
+            max_objects: 256,
         }
     }
 }
@@ -166,6 +189,17 @@ impl PaperEngineConfig {
                 "acquisition timeouts must be positive and total >= per-request".into(),
             ));
         }
+        let e = &self.extraction;
+        if e.max_text_bytes == 0 || e.max_text_bytes > 256 * 1024 * 1024 {
+            return Err(ConfigError::Invalid(
+                "extraction.max_text_bytes must be between 1 and 256 MiB".into(),
+            ));
+        }
+        if e.max_objects == 0 || e.max_objects > 100_000 {
+            return Err(ConfigError::Invalid(
+                "extraction.max_objects must be between 1 and 100000".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -198,6 +232,13 @@ impl PaperEngineConfig {
                 self.acquisition.inter_download_delay_seconds,
             ),
             allow_http: self.acquisition.allow_http,
+        }
+    }
+
+    pub fn extraction_config(&self) -> ExtractionConfig {
+        ExtractionConfig {
+            max_text_bytes: self.extraction.max_text_bytes,
+            max_objects: self.extraction.max_objects,
         }
     }
 }

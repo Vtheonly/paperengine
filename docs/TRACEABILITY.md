@@ -20,8 +20,9 @@ This map links requirements to the existing issue backlog and the current implem
 | Durable queue, leases, retries, backpressure scheduler | issues #18 through #26; the SPSC ring remains volatile; run-scoped budgets and reports exist in `src/library.rs`; staged dry-run planning still open |
 | Streaming fetch with validator-guarded resume, PDF signature gate and incremental hashes | issue #27 (complete); `src/fetcher/stream.rs`, `tests/downloader_tests.rs` |
 | PDF validation and quarantine | issue #28 (complete, closed 2026-10-19); `src/fetcher/pdf_validation.rs`, `tests/pdf_validation_tests.rs` |
-| Content-addressed storage and atomic finalization | issue #29 (partial); `src/library.rs` (objects/, manifests/, atomic rename, dedup, sync); multi-volume still open || Multi-volume capacity, integrity scans and backups | issue #30; not yet complete |
-| Extraction, incremental index, CLI search | issues #31 through #33; `paperengine inspect` lists objects/manifests; text extraction and Tantivy search still open |
+| Content-addressed storage and atomic finalization | issue #29 (partial); `src/library.rs` (objects/, manifests/, atomic rename, dedup, sync); multi-volume still open |
+| Multi-volume capacity, integrity scans and backups | issue #30; not yet complete |
+| Extraction, incremental index, CLI search | issue #31 (complete, 2026-10-19): real-parser PDF text + `/Info` metadata extraction with versioned extractor identity, content-addressed text artifacts, provenance records, bounded budgets, deterministic re-runs, `extract` CLI (`src/extract.rs`, `src/cli/extract.rs`, `tests/extraction_tests.rs`); issues #32 (Tantivy indexing) and #33 (CLI search) still open — `paperengine inspect` lists objects/manifests |
 | Logs, metrics, fault injection and benchmarks | issues #34 through #36; JSONL run reports exist (`src/library.rs`); structured logs/metrics/benchmarks still absent — no performance claims made |
 | Source coverage registry and live verification | docs/SOURCE_COVERAGE.md (per-source status, capabilities, limits, last live result); docs/VERIFICATION.md (recorded evidence, 2026-10-19) |
 | Colab and optional external workflows | issue #38 (partial); `colab/PaperEngine_Colab.ipynb` + `scripts/colab-equivalent-run.sh` (Linux replay verified; live Colab runtime not yet exercised) |

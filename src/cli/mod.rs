@@ -9,6 +9,7 @@ use std::error::Error;
 
 pub mod acquire;
 pub mod discover;
+pub mod extract;
 pub mod inspect;
 pub mod lookup;
 pub mod rank;
@@ -93,10 +94,11 @@ pub fn dispatch(command: &str, args: impl Iterator<Item = String>) -> Result<(),
         "discover" => discover::run(args),
         "lookup" => lookup::run(args),
         "acquire" => acquire::run(args),
+        "extract" => extract::run(args),
         "inspect" => inspect::run(args),
         "self-test" => selftest::run(args),
         other => Err(format!(
-            "unknown command `{other}`; expected one of: rank, discover, lookup, acquire, inspect, self-test"
+            "unknown command `{other}`; expected one of: rank, discover, lookup, acquire, extract, inspect, self-test"
         )
         .into()),
     }
@@ -110,6 +112,7 @@ commands:
   discover   search a scholarly source and write metadata JSONL (no downloads)
   lookup     resolve a single DOI through a source adapter (no downloads)
   acquire    download permitted OA PDFs from a discovery file into a local library
+  extract    extract text and metadata from a library's objects (offline)
   inspect    list the contents of a local library
   self-test  print each adapter's offline capability report
 

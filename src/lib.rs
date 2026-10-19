@@ -4,6 +4,7 @@
 pub mod concurrency;
 pub mod config;
 pub mod engine_architecture;
+pub mod extract;
 pub mod fetcher;
 pub mod layers;
 pub mod library;

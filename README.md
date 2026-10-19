@@ -20,13 +20,14 @@ Implemented now:
 - A **versioned source-adapter contract** with typed error taxonomy (403/429 are stop conditions, never challenges), per-source rate policies with request pacing, and a registry that refuses incompatible plugins.
 - **Source adapters** using documented public APIs: OpenAlex, arXiv, Crossref, Unpaywall, and Europe PMC. Crossref is metadata-only by design; OpenAlex/Unpaywall resolve open-access locations; arXiv provides direct OA PDFs; Europe PMC adds `cursorMark` pagination, PMCID identifiers, and OA-subset PDF render links.
 - Identifier normalization for DOI, arXiv (modern + legacy), PMID, and PMCID with equivalent-form tests.
-- A bounded, download-free **discovery runner** and a CLI: `discover`, `lookup`, `acquire`, `inspect`, `self-test`, and `rank`.
+- A bounded, download-free **discovery runner** and a CLI: `discover`, `lookup`, `acquire`, `extract`, `inspect`, `self-test`, and `rank`.
 - **Content-addressed storage**: `objects/<sha256[0..2]>/<sha256>.pdf` published by atomic rename, provenance manifests, per-run JSONL acquisition reports, dedup, and a pre-request URL policy gate (scheme, credentials, host).
 - Offline integration tests over a local HTTP fixture server, plus opt-in bounded live tests against the real APIs — including real PDF acquisitions through the production pipeline (arXiv verified; Europe PMC acquisition is 403-blocked on datacenter networks and records BLOCKED evidence).
 - Validated configuration file (`paperengine.toml`) with unknown-key rejection and actionable budget errors.
+- **Provenance-aware extraction (#31)**: real-parser PDF text and `/Info` metadata extraction over finalized objects, with a versioned extractor identity, per-object provenance records, content-addressed text artifacts (`extracted/`), bounded budgets, deterministic re-runs, and an `extract` CLI command.
 - GitHub Actions formatting, Clippy, test, and release-build checks; a separate manually-triggered live-test workflow.
 
-Still **not implemented**: URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, real PDF text extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+Still **not implemented**: URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
 
 ## Source adapters
 
@@ -104,6 +105,20 @@ Run reports are written to `research-library/reports/`.
 ```bash
 ./target/release/paperengine inspect --library ./research-library
 ```
+
+### Extract text and metadata from acquired objects
+
+```bash
+./target/release/paperengine extract --library ./research-library
+```
+
+Extraction runs the real PDF parser over every finalized object (no network), writes a
+content-addressed text artifact under `extracted/`, and records provenance under
+`extraction/`: extractor identity and version, source object digest, page count, PDF
+`/Info` metadata (title, author, …), text hash and byte length, truncation flags, and
+bounded per-page notes. Completed extractions are skipped on re-run; `--force`
+re-extracts and produces byte-identical text. Failures are retried on the next run.
+A per-run report lands in `research-library/reports/`.
 
 ### Recovery
 

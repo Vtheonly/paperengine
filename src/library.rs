@@ -9,6 +9,8 @@
 //!   quarantine/                           rejected payloads + typed reason manifests
 //!   reports/<unix>-acquire.jsonl          per-run acquisition reports
 //!   tmp/                                  scratch for in-flight transfers (never durable)
+//!   extracted/<sha[0..2]>/<sha>.txt       extracted text artifacts (#31, src/extract.rs)
+//!   extraction/<sha>.json                 extraction provenance records (#31)
 //! ```
 //!
 //! A download is reported as acquired only after the payload passed structural PDF
@@ -170,6 +172,16 @@ impl LibraryLayout {
         self.root.join("tmp")
     }
 
+    /// Extracted text artifacts (`extracted/<sha[0..2]>/<sha>.txt`), see `src/extract.rs`.
+    pub fn extracted_dir(&self) -> PathBuf {
+        self.root.join("extracted")
+    }
+
+    /// Extraction provenance records (`extraction/<sha>.json`).
+    pub fn extraction_dir(&self) -> PathBuf {
+        self.root.join("extraction")
+    }
+
     /// Create the directory skeleton. Idempotent.
     pub fn create(&self) -> Result<(), LibraryError> {
         for directory in [
@@ -179,6 +191,8 @@ impl LibraryLayout {
             self.quarantine_dir(),
             self.reports_dir(),
             self.tmp_dir(),
+            self.extracted_dir(),
+            self.extraction_dir(),
         ] {
             fs::create_dir_all(directory)?;
         }
