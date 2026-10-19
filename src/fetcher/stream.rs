@@ -983,7 +983,15 @@ mod tests {
         server.join().unwrap();
 
         assert_eq!(result.resumed_from, 0);
-        assert_eq!(std::fs::read(destination).unwrap(), b"replacement");
+        assert_eq!(std::fs::read(destination).unwrap(), b"%PDF-newxx");
+        assert_eq!(
+            result.blake3_hex,
+            blake3::hash(b"%PDF-newxx").to_hex().to_string()
+        );
+        assert_eq!(
+            result.sha256_hex,
+            format!("{:x}", Sha256::digest(b"%PDF-newxx"))
+        );
     }
 
     #[tokio::test]
@@ -1005,7 +1013,15 @@ mod tests {
         let requests = server.join().unwrap();
 
         assert_eq!(result.resumed_from, 0);
-        assert_eq!(std::fs::read(destination).unwrap(), b"new-object!");
+        assert_eq!(std::fs::read(destination).unwrap(), b"%PDF-newxx");
+        assert_eq!(
+            result.blake3_hex,
+            blake3::hash(b"%PDF-newxx").to_hex().to_string()
+        );
+        assert_eq!(
+            result.sha256_hex,
+            format!("{:x}", Sha256::digest(b"%PDF-newxx"))
+        );
         assert!(requests[2].to_ascii_lowercase().find("range:").is_none());
     }
 
