@@ -9,17 +9,20 @@ use futures_util::StreamExt;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Response, StatusCode, Url};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use thiserror::Error;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct DownloadConfig {
     /// Hard cap for the complete representation, in bytes.
     pub max_bytes: u64,
+    /// Minimum size required before a completed representation can be published.
+    pub min_bytes: u64,
     /// Upper bound for one HTTP request, including streamed response time.
     pub request_timeout: Duration,
     /// Upper bound for the complete transfer, including resume-range requests.
@@ -30,6 +33,7 @@ impl Default for DownloadConfig {
     fn default() -> Self {
         Self {
             max_bytes: 512 * 1024 * 1024,
+            min_bytes: 1024,
             request_timeout: Duration::from_secs(45),
             total_timeout: Duration::from_secs(15 * 60),
         }
@@ -45,6 +49,10 @@ pub struct DownloadResult {
     pub resumed_from: u64,
     pub etag: Option<String>,
     pub last_modified: Option<String>,
+    /// BLAKE3 checksum of the complete representation.
+    pub blake3_hex: String,
+    /// SHA-256 checksum of the complete representation.
+    pub sha256_hex: String,
 }
 
 #[derive(Debug, Error)]
@@ -61,6 +69,10 @@ pub enum DownloadError {
     Timeout,
     #[error("response exceeds the configured maximum of {limit} bytes")]
     TooLarge { limit: u64 },
+    #[error("response is smaller than the configured minimum of {minimum} bytes (received {size})")]
+    TooSmall { size: u64, minimum: u64 },
+    #[error("payload from {url} has no PDF signature in its first 1,024 bytes (prefix: {prefix:?})")]
+    InvalidSignature { url: String, prefix: Vec<u8> },
     #[error("invalid download response: {0}")]
     Protocol(String),
     #[error("destination already exists: {0}")]
@@ -133,6 +145,14 @@ impl ResumableDownloader {
     pub fn new(config: DownloadConfig) -> Result<Self, DownloadError> {
         if config.max_bytes == 0 {
             return Err(DownloadError::InvalidConfig("max_bytes must be positive"));
+        }
+        if config.min_bytes == 0 {
+            return Err(DownloadError::InvalidConfig("min_bytes must be positive"));
+        }
+        if config.min_bytes > config.max_bytes {
+            return Err(DownloadError::InvalidConfig(
+                "min_bytes must not exceed max_bytes",
+            ));
         }
         if config.request_timeout.is_zero() {
             return Err(DownloadError::InvalidConfig(
@@ -368,6 +388,31 @@ impl ResumableDownloader {
                         .to_owned(),
                 ));
             }
+
+            // Rebuild both digests from the saved prefix with bounded memory. The prefix scan
+            // also seeds the signature probe so a header split across range boundaries is valid.
+            let mut blake3_hasher = blake3::Hasher::new();
+            let mut sha256_hasher = Sha256::new();
+            let mut signature_probe = Vec::with_capacity(1024);
+            if offset > 0 {
+                prime_hashers_from_disk(
+                    &part_path,
+                    offset,
+                    &mut blake3_hasher,
+                    &mut sha256_hasher,
+                    &mut signature_probe,
+                )
+                .await?;
+            }
+            let signature_verified = signature_probe.windows(5).any(|window| window == b"%PDF-");
+            if !signature_verified && signature_probe.len() >= 1024 {
+                reset_partial(&part_path, &metadata_path).await?;
+                return Err(DownloadError::InvalidSignature {
+                    url: source_url.clone(),
+                    prefix: signature_probe,
+                });
+            }
+
             save_metadata(&metadata_path, &response_metadata).await?;
 
             let append = offset > 0;
@@ -379,16 +424,30 @@ impl ResumableDownloader {
                 .open(&part_path)
                 .await?;
 
-            let received =
-                pump_response_body(response, &mut file, offset, self.config.max_bytes, deadline)
-                    .await;
+            let received = pump_response_body(
+                response,
+                &mut file,
+                offset,
+                self.config.max_bytes,
+                deadline,
+                &source_url,
+                signature_probe,
+                signature_verified,
+                range.is_some_and(|value| value.end + 1 < value.total),
+                &mut blake3_hasher,
+                &mut sha256_hasher,
+            )
+            .await;
             let received = match received {
                 Ok(count) => count,
                 Err(error) => {
                     // Preserve successfully written bytes so a later call can resume them.
                     let _ = file.sync_all().await;
                     drop(file);
-                    if matches!(error, DownloadError::TooLarge { .. }) {
+                    if matches!(
+                        error,
+                        DownloadError::TooLarge { .. } | DownloadError::InvalidSignature { .. }
+                    ) {
                         reset_partial(&part_path, &metadata_path).await?;
                     }
                     return Err(error);
@@ -431,6 +490,14 @@ impl ResumableDownloader {
                 }
             }
 
+            if actual_length < self.config.min_bytes {
+                reset_partial(&part_path, &metadata_path).await?;
+                return Err(DownloadError::TooSmall {
+                    size: actual_length,
+                    minimum: self.config.min_bytes,
+                });
+            }
+
             // Hard-linking publishes a complete file atomically and refuses to overwrite an
             // existing destination. Part and destination are siblings, hence on the same volume.
             match tokio::fs::hard_link(&part_path, &destination).await {
@@ -449,9 +516,39 @@ impl ResumableDownloader {
                 resumed_from,
                 etag: response_metadata.etag,
                 last_modified: response_metadata.last_modified,
+                blake3_hex: blake3_hasher.finalize().to_hex().to_string(),
+                sha256_hex: format!("{:x}", sha256_hasher.finalize()),
             });
         }
     }
+}
+
+async fn prime_hashers_from_disk(
+    path: &Path,
+    bytes_to_read: u64,
+    blake3_hasher: &mut blake3::Hasher,
+    sha256_hasher: &mut Sha256,
+    signature_probe: &mut Vec<u8>,
+) -> Result<(), DownloadError> {
+    let mut file = tokio::fs::File::open(path).await?;
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut remaining = bytes_to_read;
+
+    while remaining > 0 {
+        let to_read = remaining.min(buffer.len() as u64) as usize;
+        file.read_exact(&mut buffer[..to_read]).await?;
+        blake3_hasher.update(&buffer[..to_read]);
+        sha256_hasher.update(&buffer[..to_read]);
+
+        let probe_remaining = 1024_usize.saturating_sub(signature_probe.len());
+        let probe_bytes = probe_remaining.min(to_read);
+        if probe_bytes > 0 {
+            signature_probe.extend_from_slice(&buffer[..probe_bytes]);
+        }
+        remaining -= to_read as u64;
+    }
+
+    Ok(())
 }
 
 async fn pump_response_body<W>(
@@ -460,12 +557,21 @@ async fn pump_response_body<W>(
     existing_bytes: u64,
     max_bytes: u64,
     deadline: Instant,
+    source_url: &str,
+    mut signature_probe: Vec<u8>,
+    mut signature_verified: bool,
+    more_ranges_expected: bool,
+    blake3_hasher: &mut blake3::Hasher,
+    sha256_hasher: &mut Sha256,
 ) -> Result<u64, DownloadError>
 where
     W: AsyncWrite + Unpin,
 {
     let mut stream = response.bytes_stream();
     let mut received = 0_u64;
+    // Data is held only until the PDF signature is validated; this remains bounded to the
+    // current transport chunk plus at most the 1-KiB signature-probe window.
+    let mut pending_new_bytes = Vec::with_capacity(1024);
 
     loop {
         let next = match tokio::time::timeout_at(deadline, stream.next()).await {
@@ -477,16 +583,62 @@ where
             Some(Err(error)) if error.is_timeout() => return Err(DownloadError::Timeout),
             Some(Err(error)) => return Err(DownloadError::Http(error)),
             Some(Ok(chunk)) => {
-                let total = existing_bytes
+                let prospective = existing_bytes
                     .checked_add(received)
+                    .and_then(|value| value.checked_add(pending_new_bytes.len() as u64))
                     .and_then(|value| value.checked_add(chunk.len() as u64))
                     .ok_or(DownloadError::TooLarge { limit: max_bytes })?;
-                if total > max_bytes {
+                if prospective > max_bytes {
                     return Err(DownloadError::TooLarge { limit: max_bytes });
                 }
-                output.write_all(&chunk).await?;
-                received += chunk.len() as u64;
+
+                if !signature_verified {
+                    let probe_remaining = 1024_usize.saturating_sub(signature_probe.len());
+                    let probe_bytes = probe_remaining.min(chunk.len());
+                    signature_probe.extend_from_slice(&chunk[..probe_bytes]);
+                    pending_new_bytes.extend_from_slice(&chunk);
+
+                    signature_verified = signature_probe
+                        .windows(5)
+                        .any(|window| window == b"%PDF-");
+
+                    if !signature_verified && signature_probe.len() >= 1024 {
+                        return Err(DownloadError::InvalidSignature {
+                            url: source_url.to_owned(),
+                            prefix: signature_probe,
+                        });
+                    }
+
+                    if signature_verified {
+                        output.write_all(&pending_new_bytes).await?;
+                        blake3_hasher.update(&pending_new_bytes);
+                        sha256_hasher.update(&pending_new_bytes);
+                        received += pending_new_bytes.len() as u64;
+                        pending_new_bytes.clear();
+                    }
+                } else {
+                    output.write_all(&chunk).await?;
+                    blake3_hasher.update(&chunk);
+                    sha256_hasher.update(&chunk);
+                    received += chunk.len() as u64;
+                }
             }
+        }
+    }
+
+    if !signature_verified {
+        if more_ranges_expected && signature_probe.len() < 1024 {
+            // A valid server can split the PDF header across 206 segments. Keep only the bounded
+            // unverified prefix; a later range extends the probe before any bytes can be published.
+            output.write_all(&pending_new_bytes).await?;
+            blake3_hasher.update(&pending_new_bytes);
+            sha256_hasher.update(&pending_new_bytes);
+            received += pending_new_bytes.len() as u64;
+        } else {
+            return Err(DownloadError::InvalidSignature {
+                url: source_url.to_owned(),
+                prefix: signature_probe,
+            });
         }
     }
 
@@ -659,6 +811,7 @@ mod tests {
     fn test_config(max_bytes: u64) -> DownloadConfig {
         DownloadConfig {
             max_bytes,
+            min_bytes: 1,
             request_timeout: Duration::from_millis(800),
             total_timeout: Duration::from_secs(4),
         }
@@ -666,8 +819,8 @@ mod tests {
 
     #[tokio::test]
     async fn accepts_a_complete_206_range_response() {
-        let (url, server) = start_server(vec![WireResponse::new("206 Partial Content", b"data")
-            .header("Content-Range", "bytes 0-3/4")
+        let (url, server) = start_server(vec![WireResponse::new("206 Partial Content", b"%PDF-data")
+            .header("Content-Range", "bytes 0-8/9")
             .header("ETag", "\"v1\"")]);
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("paper.pdf");
@@ -678,15 +831,82 @@ mod tests {
             .unwrap();
         server.join().unwrap();
 
-        assert_eq!(result.bytes, 4);
+        assert_eq!(result.bytes, 9);
         assert_eq!(result.resumed_from, 0);
-        assert_eq!(std::fs::read(destination).unwrap(), b"data");
+        assert_eq!(std::fs::read(destination).unwrap(), b"%PDF-data");
+        assert_eq!(result.blake3_hex, blake3::hash(b"%PDF-data").to_hex().to_string());
+        assert_eq!(result.sha256_hex, format!("{:x}", Sha256::digest(b"%PDF-data")));
+    }
+
+    #[tokio::test]
+    async fn validates_signature_split_across_range_boundaries_and_hashes_both_digests() {
+        let payload = b"%PDF-data".to_vec();
+        let (url, server) = start_server(vec![
+            WireResponse::new("206 Partial Content", b"%PDF")
+                .header("Content-Range", "bytes 0-3/9")
+                .header("ETag", "\"v1\""),
+            WireResponse::new("206 Partial Content", b"-data")
+                .header("Content-Range", "bytes 4-8/9")
+                .header("ETag", "\"v1\""),
+        ]);
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("paper.pdf");
+        let result = ResumableDownloader::new(test_config(100))
+            .unwrap()
+            .download(&url, &destination)
+            .await
+            .unwrap();
+        server.join().unwrap();
+
+        assert_eq!(std::fs::read(destination).unwrap(), payload);
+        assert_eq!(result.blake3_hex, blake3::hash(&payload).to_hex().to_string());
+        assert_eq!(result.sha256_hex, format!("{:x}", Sha256::digest(&payload)));
+    }
+
+    #[tokio::test]
+    async fn rejects_html_and_cleans_partial_artifacts() {
+        let html = b"<!DOCTYPE html><html><body>access denied</body></html>";
+        let (url, server) = start_server(vec![
+            WireResponse::new("200 OK", html).header("Content-Type", "text/html")
+        ]);
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("paper.pdf");
+        let result = ResumableDownloader::new(test_config(1000))
+            .unwrap()
+            .download(&url, &destination)
+            .await;
+        server.join().unwrap();
+
+        assert!(matches!(result, Err(DownloadError::InvalidSignature { .. })));
+        assert!(!destination.exists());
+        assert!(!append_suffix(&destination, ".part").exists());
+        assert!(!append_suffix(&destination, ".part.meta").exists());
+    }
+
+    #[tokio::test]
+    async fn rejects_complete_pdf_below_configured_minimum_size() {
+        let (url, server) = start_server(vec![
+            WireResponse::new("200 OK", b"%PDF-tiny").header("ETag", "\"v1\"")
+        ]);
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("paper.pdf");
+        let result = ResumableDownloader::new(DownloadConfig {
+            min_bytes: 1024,
+            ..test_config(2048)
+        })
+        .unwrap()
+        .download(&url, &destination)
+        .await;
+        server.join().unwrap();
+
+        assert!(matches!(result, Err(DownloadError::TooSmall { .. })));
+        assert!(!destination.exists());
     }
 
     #[tokio::test]
     async fn resumes_interrupted_body_only_with_matching_validator() {
         let (url, server) = start_server(vec![
-            WireResponse::new("200 OK", b"hello")
+            WireResponse::new("200 OK", b"%PDF-")
                 .header("ETag", "\"v1\"")
                 .declared_length(10),
             WireResponse::new("206 Partial Content", b"world")
@@ -701,7 +921,9 @@ mod tests {
         let requests = server.join().unwrap();
 
         assert_eq!(result.resumed_from, 5);
-        assert_eq!(std::fs::read(destination).unwrap(), b"helloworld");
+        assert_eq!(std::fs::read(destination).unwrap(), b"%PDF-world");
+        assert_eq!(result.blake3_hex, blake3::hash(b"%PDF-world").to_hex().to_string());
+        assert_eq!(result.sha256_hex, format!("{:x}", Sha256::digest(b"%PDF-world")));
         assert!(requests[1].to_ascii_lowercase().contains("range: bytes=5-"));
         assert!(requests[1]
             .to_ascii_lowercase()
@@ -711,10 +933,10 @@ mod tests {
     #[tokio::test]
     async fn ignored_range_restarts_without_appending_to_partial_bytes() {
         let (url, server) = start_server(vec![
-            WireResponse::new("200 OK", b"old!!")
+            WireResponse::new("200 OK", b"%PDF-")
                 .header("ETag", "\"v1\"")
                 .declared_length(10),
-            WireResponse::new("200 OK", b"replacement").header("ETag", "\"v2\""),
+            WireResponse::new("200 OK", b"%PDF-newxx").header("ETag", "\"v2\""),
         ]);
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("paper.pdf");
@@ -730,13 +952,13 @@ mod tests {
     #[tokio::test]
     async fn changed_object_in_206_forces_a_clean_full_restart() {
         let (url, server) = start_server(vec![
-            WireResponse::new("200 OK", b"first")
+            WireResponse::new("200 OK", b"%PDF-")
                 .header("ETag", "\"v1\"")
                 .declared_length(10),
             WireResponse::new("206 Partial Content", b"other")
                 .header("Content-Range", "bytes 5-9/10")
                 .header("ETag", "\"v2\""),
-            WireResponse::new("200 OK", b"new-object!").header("ETag", "\"v2\""),
+            WireResponse::new("200 OK", b"%PDF-newxx").header("ETag", "\"v2\""),
         ]);
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("paper.pdf");
@@ -808,7 +1030,7 @@ mod tests {
 
     #[tokio::test]
     async fn propagates_disk_full_write_errors_for_recovery() {
-        let (url, server) = start_server(vec![WireResponse::new("200 OK", b"disk-space-test")]);
+        let (url, server) = start_server(vec![WireResponse::new("200 OK", b"%PDF-disk-space-test")]);
         let response = Client::new().get(url).send().await.unwrap();
         let mut output = NoSpaceWriter;
         let result = pump_response_body(
@@ -817,6 +1039,12 @@ mod tests {
             0,
             100,
             Instant::now() + Duration::from_secs(2),
+            "http://localhost/paper.pdf",
+            Vec::new(),
+            false,
+            false,
+            &mut blake3::Hasher::new(),
+            &mut Sha256::new(),
         )
         .await;
         server.join().unwrap();
