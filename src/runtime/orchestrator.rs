@@ -1,15 +1,15 @@
-//! Connects the pure in-memory acquisition kernel to a bounded I/O-worker event queue.
+//! Connects the pure in-memory acquisition kernel to a bounded worker event queue.
 //!
 //! This module dispatches decisions only. It does not invent URLs, perform HTTP, authorize
-//! sources, or declare download/indexing completion. Worker adapters resolve the real paper
-//! and source metadata, re-check policy, and then execute the requested operation.
+//! sources, or declare download/indexing completion. Worker adapters must resolve actual
+//! metadata and re-check source policy immediately before any request or download.
 
 use crate::concurrency::ring::{
     RingProducer, TaskEnvelope, ACTION_ACQUIRE_VERIFIED, ACTION_ENRICH_METADATA,
     ACTION_RESOLVE_ROUTE, ACTION_VALIDATE_CANDIDATE, EVENT_FLAG_FINAL,
 };
 use crate::layers::layer2_state::FrontierNodeHot;
-use crate::layers::layer5_control::{AcquisitionEngine, EngineCursor, EngineError, SearchProgress};
+use crate::layers::layer5_control::{AcquisitionEngine, EngineCursor, EngineError};
 use crate::layers::layer6_output::{AcquisitionAction, AcquisitionDecision};
 use core::fmt;
 
@@ -37,21 +37,22 @@ pub struct RuntimeProgress {
     pub best: Option<AcquisitionDecision>,
 }
 
-/// Persistent loop state, including one retained event if the ring is full.
-/// The caller must keep passing the same immutable frontier for the cursor's lifetime.
+/// Persistent loop state including a fixed-size event retained when the ring is full.
+/// The caller must pass the same immutable frontier snapshot for this cursor's lifetime.
 pub struct OrchestratorCursor {
     engine_cursor: EngineCursor,
+    total_candidates: usize,
     last_sent: Option<AcquisitionDecision>,
     pending: Option<TaskEnvelope>,
     pending_decision: Option<AcquisitionDecision>,
     pending_final: bool,
     final_sent: bool,
 }
-
 impl OrchestratorCursor {
     pub fn new(engine: &AcquisitionEngine, frontier: &[FrontierNodeHot]) -> Self {
         Self {
             engine_cursor: engine.begin(frontier),
+            total_candidates: frontier.len(),
             last_sent: None,
             pending: None,
             pending_decision: None,
@@ -59,22 +60,15 @@ impl OrchestratorCursor {
             final_sent: false,
         }
     }
-
-    pub const fn is_complete(&self) -> bool {
-        self.final_sent
-    }
-
-    pub const fn best(&self) -> Option<AcquisitionDecision> {
-        self.engine_cursor.best()
-    }
+    pub const fn is_complete(&self) -> bool { self.final_sent }
+    pub const fn best(&self) -> Option<AcquisitionDecision> { self.engine_cursor.best() }
 }
 
-/// A synchronous bounded event-loop turn. It is intentionally non-spinning: when the
-/// ring is full it retains the pending fixed-size envelope and returns to the scheduler.
+/// One bounded event-loop turn. A full ring produces a resumable backpressure result instead
+/// of an internal spin loop, and an unsent event is retained inside OrchestratorCursor.
 pub struct EngineOrchestrator {
     candidate_budget_per_turn: usize,
 }
-
 impl EngineOrchestrator {
     pub fn new(candidate_budget_per_turn: usize) -> Result<Self, RuntimeError> {
         if candidate_budget_per_turn == 0 {
@@ -90,6 +84,10 @@ impl EngineOrchestrator {
         cursor: &mut OrchestratorCursor,
         producer: &mut RingProducer<'_, N>,
     ) -> Result<RuntimeProgress, RuntimeError> {
+        if cursor.total_candidates != frontier.len() {
+            return Err(RuntimeError::Engine(EngineError::CursorDoesNotMatchFrontier));
+        }
+
         if let Some(event) = cursor.pending {
             match producer.try_enqueue(event) {
                 Ok(()) => {
@@ -99,22 +97,22 @@ impl EngineOrchestrator {
                     cursor.pending_decision = None;
                     cursor.pending_final = false;
                 }
-                Err(_) => return Ok(self.progress(cursor, true)),
+                Err(_) => return Ok(Self::progress(cursor, true)),
             }
         }
 
         if cursor.final_sent {
-            return Ok(self.progress(cursor, false));
+            return Ok(Self::progress(cursor, false));
         }
 
-        let progress: SearchProgress = engine.step(
+        let progress = engine.step(
             frontier,
             &mut cursor.engine_cursor,
             self.candidate_budget_per_turn,
         )?;
 
         let should_emit = match progress.best {
-            Some(best) if progress.complete => !cursor.final_sent,
+            Some(_) if progress.complete => !cursor.final_sent,
             Some(best) => cursor.last_sent != Some(best),
             None => progress.complete,
         };
@@ -131,7 +129,7 @@ impl EngineOrchestrator {
                         cursor.pending = Some(returned);
                         cursor.pending_decision = Some(decision);
                         cursor.pending_final = progress.complete;
-                        return Ok(self.progress(cursor, true));
+                        return Ok(Self::progress(cursor, true));
                     }
                 }
             } else if progress.complete {
@@ -141,7 +139,7 @@ impl EngineOrchestrator {
             cursor.final_sent = true;
         }
 
-        Ok(self.progress(cursor, false))
+        Ok(Self::progress(cursor, false))
     }
 
     fn to_envelope(
@@ -172,14 +170,13 @@ impl EngineOrchestrator {
         })
     }
 
-    fn progress<const N: usize>(
-        &self,
+    fn progress(
         cursor: &OrchestratorCursor,
         backpressured: bool,
     ) -> RuntimeProgress {
         RuntimeProgress {
             candidates_evaluated: cursor.engine_cursor.candidates_evaluated(),
-            total_candidates: cursor.engine_cursor_total(),
+            total_candidates: cursor.total_candidates,
             completed: cursor.final_sent,
             backpressured,
             best: cursor.engine_cursor.best(),
@@ -187,13 +184,65 @@ impl EngineOrchestrator {
     }
 }
 
-impl OrchestratorCursor {
-    fn engine_cursor_total(&self) -> usize {
-        // Total count is not exposed on EngineCursor; it is invariantly stored at creation
-        // and the caller provides a frontier of the same size to each run_turn.
-        self.total_candidates
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::concurrency::ring::{EngineRingBuffer, EVENT_FLAG_FINAL};
+    use crate::layers::layer2_state::{FLAG_HAS_METADATA, FLAG_RESTRICTED_BY_SOURCE};
+    use crate::layers::layer5_control::PolicyConfig;
+
+    fn make_engine() -> AcquisitionEngine {
+        AcquisitionEngine::new(PolicyConfig::new(2026, 4).unwrap()).unwrap()
     }
 
-    // Keep the total as an explicit runtime invariant without cloning the frontier.
-    total_candidates: usize,
+    #[test]
+    fn emits_final_decision_and_preserves_backpressure_without_spinning() {
+        let frontier: Vec<_> = (1..=12).map(|id| FrontierNodeHot {
+            paper_id: id,
+            citation_count: id as u32 * 20,
+            source_id: 2,
+            flags: FLAG_HAS_METADATA,
+            ..FrontierNodeHot::default()
+        }).collect();
+
+        let engine = make_engine();
+        let mut cursor = OrchestratorCursor::new(&engine, &frontier);
+        let loop_engine = EngineOrchestrator::new(4).unwrap();
+        let mut ring = EngineRingBuffer::<2>::new();
+        let (mut producer, mut consumer) = ring.split();
+        let mut observed_final = false;
+
+        for _ in 0..20 {
+            let progress = loop_engine.run_turn(&engine, &frontier, &mut cursor, &mut producer).unwrap();
+            while let Some(event) = consumer.try_dequeue() {
+                if event.flags & EVENT_FLAG_FINAL != 0 {
+                    observed_final = true;
+                    assert_eq!(event.paper_id, 12);
+                }
+            }
+            if progress.completed { break; }
+        }
+
+        assert!(cursor.is_complete());
+        assert!(observed_final);
+    }
+
+    #[test]
+    fn restricted_high_score_candidate_is_never_dispatched() {
+        let frontier = [
+            FrontierNodeHot { paper_id: 1, citation_count: 1, flags: FLAG_HAS_METADATA, ..FrontierNodeHot::default() },
+            FrontierNodeHot { paper_id: 2, citation_count: u32::MAX, flags: FLAG_HAS_METADATA | FLAG_RESTRICTED_BY_SOURCE, ..FrontierNodeHot::default() },
+        ];
+        let engine = make_engine();
+        let mut cursor = OrchestratorCursor::new(&engine, &frontier);
+        let loop_engine = EngineOrchestrator::new(8).unwrap();
+        let mut ring = EngineRingBuffer::<4>::new();
+        let (mut producer, mut consumer) = ring.split();
+        loop {
+            if loop_engine.run_turn(&engine, &frontier, &mut cursor, &mut producer).unwrap().completed { break; }
+        }
+        while let Some(event) = consumer.try_dequeue() {
+            assert_eq!(event.paper_id, 1);
+        }
+    }
 }
