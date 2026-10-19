@@ -34,9 +34,9 @@ serialized execution is what actually honors each source's minimum interval.
 
 - **Endpoint:** `https://api.openalex.org/works` (REST, JSON; cursor pagination)
 - **Adapter:** `src/sources/openalex.rs` (contract version 1, adapter version 1)
-- **Status:** fixture-tested; live-verified 2026-10-19 at L2 (DOI lookup) and L3
-  (acquisition); search currently **blocked** from this network by the shared
-  free-tier budget (see below)
+- **Status:** fixture-tested; live-verified 2026-10-19 at L2 (DOI lookup **and discovery**)
+  and L3 (acquisition); from IP-limited networks discovery is reported as blocked
+  (see below)
 - **Access basis:** public REST API with a polite contact e-mail. Since 2026 OpenAlex
   shares one free daily budget per IP for key-less requests and offers free per-key
   budgets; the adapter supports an optional `openalex_api_key`.
@@ -62,12 +62,21 @@ serialized execution is what actually honors each source's minimum interval.
   `4f111c22feab76f1f8b5e33474a01933f97d67cfbf56d4fbd53e7721edc22006`, stored
   content-addressed with manifest provenance. The payload is byte-identical to the
   same work acquired through the Unpaywall adapter, cross-checking both resolvers.
-  Search returned HTTP 429 ("free daily budget shared by everyone on your network's
-  IP address… is used up") — recorded as BLOCKED, not as failure; an API key lifts
-  this limit and is a documented configuration option.
-- **Limitations / next step:** live search verification pending an API key or budget
-  reset; `from_publication_date` filters and incremental cross-run ingestion belong to
-  the discovery workflow (issue #9), not the adapter.
+  Search from an IP-limited network returns HTTP 429 ("free daily budget shared by
+  everyone on your network's IP address… is used up") — recorded as BLOCKED, not as
+  failure; an API key lifts this limit and is a documented configuration option.
+  Discovery itself was live-verified 2026-10-19 from a GitHub CI runner (fresh IP,
+  run 39243606887): `page_size=25` returned 21 post-filter records, first
+  `W1572277998`.
+- **Post-filter page semantics (observed live):** the adapter fetches `per-page`
+  raw results and removes non-paper work types, so a small page can legitimately
+  come back empty even when the source has matches — with `page_size=2` on a fresh
+  IP, both raw hits were non-paper types and the page was empty (run 39242803787).
+  The discovery runner stops at an empty page; whether the adapter should refill a
+  filtered page within one call is a pagination-semantics question tracked with
+  issue #9. Until then, use the documented default page size (25; policy max 200).
+- **Limitations / next step:** `from_publication_date` filters and incremental
+  cross-run ingestion belong to the discovery workflow (issue #9), not the adapter.
 
 ### arXiv
 

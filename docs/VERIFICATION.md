@@ -284,3 +284,53 @@ itself reports these URLs for OA records — with the conservative guarantees ke
 lite responses without `fullTextUrlList` never fabricate a link, subscription entries
 never become PDFs, and the datacenter 403 refusal is recorded as BLOCKED evidence
 rather than retried or evaded. The identifier kind is unified as `pmcid`.
+
+---
+
+# Verification Report — 2026-10-19 (third run: deployment replays and a GitHub-runner live pass)
+
+## Deployment paths (issue #38)
+
+- `scripts/setup-linux.sh`: executed end-to-end on this machine (Debian 13,
+  rustc 1.99.1). Tool checks, release build, fmt/clippy/offline tests, the
+  `rank` smoke test, and the printed next-step commands all behaved as
+  documented.
+- `scripts/colab-equivalent-run.sh 2a60202`: executed on a clean checkout in a
+  fresh temp workspace. Full replay of notebook cells 1–7: clone at the pinned
+  revision, build, offline verification, config + self-test, live arXiv
+  discovery (5 records), Unpaywall DOI resolution, real acquisition of two
+  arXiv PDFs (447,412 + 2,215,244 bytes), budget exhaustion correctly skipping
+  the remaining records with a recovery note, `inspect` output, and the run
+  report. Library, provenance manifests, and report JSONL all persisted.
+
+## Live-source workflow on GitHub infrastructure
+
+The opt-in `live-sources` workflow was dispatched manually with real
+acquisition enabled. Two runs on `main`:
+
+- Run [39242803787](https://github.com/Vtheonly/paperengine/actions/runs/39242803787)
+  (head 9a7709b) **failed**: from the runner's fresh IP, OpenAlex discovery
+  succeeded, but `page_size=2` produced a page whose raw hits were both
+  non-paper types; the post-filter page was empty and the happy-path assertion
+  was unreachable. This path had only ever been exercised as the 429 BLOCKED
+  branch. Fixed in 47eea43 by using the documented default page size (25).
+- Run [39243606887](https://github.com/Vtheonly/paperengine/actions/runs/39243606887)
+  (head 23352af) **passed**: 27/27 live tests, including
+  `OpenAlex discovery OK: 21 records, first W1572277998` and the EPMC render
+  link acquisition honestly reported BLOCKED (403 bot protection) — with the
+  documented remedy of running from an unrestricted network such as Colab.
+
+## Full local verification at head 23352af (merged tree)
+
+```
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 161 passed, 0 failed, 27 ignored (live, opt-in)
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources -- --ignored --nocapture --test-threads=1 \
+                                    # 27 passed, 0 failed
+cargo build --release               # pass
+```
+
+CI on the exact commit: [39243321210](https://github.com/Vtheonly/paperengine/actions/runs/39243321210)
+success for 23352af.
