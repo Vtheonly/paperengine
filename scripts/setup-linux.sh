@@ -55,7 +55,7 @@ Next steps (all local, no cloud account required):
   ./target/release/paperengine inspect --library ./research-library
 
   # 5. Optional: bounded live tests against real sources (small request budget)
-  PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture
+  PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture --test-threads=1
 
 Offline fixture tests never touch the network. Live tests are opt-in and rate-limited.
 EOF

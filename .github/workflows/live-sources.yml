@@ -37,7 +37,7 @@ jobs:
           cargo clippy --all-targets --all-features -- -D warnings
           cargo test --all-features
       - name: Live source smoke tests (bounded)
-        run: cargo test --test live_sources -- --ignored --nocapture
+        run: cargo test --test live_sources -- --ignored --nocapture --test-threads=1
       - name: Upload acquisition evidence
         if: env.PAPERENGINE_LIVE_ACQUIRE == '1'
         run: |
