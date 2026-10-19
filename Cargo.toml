@@ -11,15 +11,19 @@ name = "paperengine"
 path = "src/lib.rs"
 
 [dependencies]
+async-trait = "0.1"
 blake3 = "1.5"
 futures-util = "0.3"
 lopdf = { version = "=0.36.0", default-features = false }
+quick-xml = "0.37"
 reqwest = { version = "0.11", default-features = false, features = ["stream", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 thiserror = "1.0"
 tokio = { version = "1.36", features = ["fs", "io-util", "macros", "rt-multi-thread", "time"] }
+toml = "0.8"
+url = "2"
 
 [dev-dependencies]
 tempfile = "3.10"

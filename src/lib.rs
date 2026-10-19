@@ -2,10 +2,13 @@
 //! All networking, filesystem access, clocks, and persistence belong in outer adapters.
 
 pub mod concurrency;
+pub mod config;
 pub mod engine_architecture;
 pub mod fetcher;
 pub mod layers;
+pub mod library;
 pub mod runtime;
+pub mod sources;
 
 pub use layers::layer1_input::{normalize_candidate, CandidateInput, InputError};
 pub use layers::layer2_state::FrontierNodeHot;

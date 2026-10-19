@@ -1,0 +1,20 @@
+# Rust build artifacts
+/target
+debug
+debug/
+
+# Cargo lockfile policy: this is a binary crate, so the lockfile IS committed.
+# (No entry for Cargo.lock.)
+
+# Local libraries produced by acquisition runs
+paperengine-library/
+*.library/
+
+# Editor and OS noise
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local configuration with personal contact data
+paperengine.local.toml

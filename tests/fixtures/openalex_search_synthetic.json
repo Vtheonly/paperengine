@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "count": 2,
+  "db_response_time_ms": 7,
+  "page": null,
+  "per_page": 25,
+  "next_cursor": "IlsxNzAsMF0="
+ },
+ "results": [
+  {
+   "id": "https://openalex.org/W2963403868",
+   "doi": "https://doi.org/10.48550/arXiv.1706.03762",
+   "title": "Attention Is All You Need",
+   "display_name": "Attention Is All You Need",
+   "publication_year": 2017,
+   "type": "article",
+   "cited_by_count": 100000,
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A237254523",
+      "display_name": "Ashish Vaswani"
+     }
+    },
+    {
+     "author_position": "last",
+     "author": {
+      "id": "https://openalex.org/A237254523",
+      "display_name": "Illia Polosukhin"
+     }
+    }
+   ],
+   "primary_location": {
+    "source": {
+     "id": "https://openalex.org/S4306400194",
+     "display_name": "arXiv (Cornell University)"
+    },
+    "landing_page_url": "https://arxiv.org/abs/1706.03762",
+    "pdf_url": null
+   },
+   "best_oa_location": {
+    "is_oa": true,
+    "landing_page_url": "https://arxiv.org/abs/1706.03762",
+    "pdf_url": "https://arxiv.org/pdf/1706.03762",
+    "license": null,
+    "source": {
+     "id": "https://openalex.org/S4306400194",
+     "display_name": "arXiv (Cornell University)"
+    }
+   },
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "green"
+   }
+  },
+  {
+   "id": "https://openalex.org/W2038657",
+   "doi": "https://doi.org/10.1371/journal.pone.0000219",
+   "title": "Synthetic record without direct PDF",
+   "display_name": "Synthetic record without direct PDF",
+   "publication_year": 2007,
+   "type": "book",
+   "cited_by_count": 10,
+   "authorships": [],
+   "primary_location": {
+    "source": null,
+    "landing_page_url": "https://doi.org/10.1371/journal.pone.0000219",
+    "pdf_url": null
+   },
+   "best_oa_location": null,
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "gold"
+   }
+  }
+ ],
+ "group_by": []
+}
