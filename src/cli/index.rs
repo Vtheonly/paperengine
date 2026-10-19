@@ -29,6 +29,7 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let report_path = library.reports_dir().join(format!("{now}-index.jsonl"));
     let mut report = BufWriter::new(File::create(&report_path)?);
+    let json_mode = flags.has("json");
 
     eprintln!(
         "indexing {library_dir} into {} ({} rebuild)…",
@@ -42,14 +43,19 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
         rebuild,
         |entry: &IndexingReportEntry| {
             let line = serde_json::to_string(entry)?;
-            println!("{line}");
+            if json_mode {
+                // Keep stdout machine-readable in --json mode.
+                eprintln!("{line}");
+            } else {
+                println!("{line}");
+            }
             report.write_all(line.as_bytes())?;
             report.write_all(b"\n")
         },
     )?;
     report.flush()?;
 
-    if flags.has("json") {
+    if json_mode {
         let summary_json = serde_json::json!({
             "library_root": library_dir,
             "manifests_examined": summary.manifests_examined,

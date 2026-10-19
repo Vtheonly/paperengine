@@ -270,6 +270,23 @@ fn open_index(
     }
 }
 
+/// Open an existing index for reading. Refuses to create one so that read paths never
+/// silently fabricate an empty index.
+fn open_index_readonly(
+    library: &LibraryLayout,
+    schema: &LibraryIndexSchema,
+) -> Result<Index, IndexError> {
+    let index_dir = library.index_dir();
+    if !index_dir.exists() {
+        return Err(IndexError::InvalidConfig(format!(
+            "no index at {}; run `paperengine index --library {}` first",
+            index_dir.display(),
+            library.root().display()
+        )));
+    }
+    open_index(library, schema, false)
+}
+
 /// Current `(object_sha -> state_digest)` mapping held by the committed index.
 fn committed_states(
     reader: &IndexReader,
@@ -590,7 +607,7 @@ pub fn search_library(
         return Err(IndexError::InvalidConfig("limit must be positive".into()));
     }
     let schema = LibraryIndexSchema::build();
-    let index = open_index(library, &schema, false)?;
+    let index = open_index_readonly(library, &schema)?;
     let reader = index.reader()?;
     let searcher = reader.searcher();
 
@@ -703,7 +720,7 @@ pub fn search_library(
 /// Count documents in the committed index (used by the CLI and parity tests).
 pub fn document_count(library: &LibraryLayout) -> Result<usize, IndexError> {
     let schema = LibraryIndexSchema::build();
-    let index = open_index(library, &schema, false)?;
+    let index = open_index_readonly(library, &schema)?;
     let reader = index.reader()?;
     let searcher = reader.searcher();
     let collector = TopDocs::with_limit(1_000_000).order_by_score();
