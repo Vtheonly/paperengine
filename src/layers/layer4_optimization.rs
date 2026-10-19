@@ -1,8 +1,8 @@
 //! Fixed-size SoA scoring with an optional runtime-gated AVX2 path.
 
 use super::layer2_state::{
-    FrontierNodeHot, FLAG_AUTHORIZED_FULL_TEXT, FLAG_HAS_METADATA,
-    FLAG_JATS_AVAILABLE, FLAG_PDF_SIGNATURE_VERIFIED,
+    FrontierNodeHot, FLAG_AUTHORIZED_FULL_TEXT, FLAG_HAS_METADATA, FLAG_JATS_AVAILABLE,
+    FLAG_PDF_SIGNATURE_VERIFIED,
 };
 
 pub const SCORE_BATCH_SIZE: usize = 16;
@@ -17,24 +17,38 @@ const METADATA_BONUS: i32 = 6_000;
 #[inline]
 pub fn avx2_available() -> bool {
     #[cfg(target_arch = "x86_64")]
-    { std::is_x86_feature_detected!("avx2") }
+    {
+        std::is_x86_feature_detected!("avx2")
+    }
     #[cfg(not(target_arch = "x86_64"))]
-    { false }
+    {
+        false
+    }
 }
 
 #[inline]
 fn recency(year: u16, reference_year: u16) -> i32 {
-    if year == 0 || year > reference_year { return 0; }
+    if year == 0 || year > reference_year {
+        return 0;
+    }
     (100 - reference_year.saturating_sub(year).min(100) as i32) * RECENCY_WEIGHT
 }
 
 #[inline]
 fn bonuses(node: &FrontierNodeHot) -> i32 {
     let mut score = 0;
-    if node.has_flag(FLAG_AUTHORIZED_FULL_TEXT) { score += AUTHORIZED_BONUS; }
-    if node.has_flag(FLAG_PDF_SIGNATURE_VERIFIED) { score += PDF_BONUS; }
-    if node.has_flag(FLAG_JATS_AVAILABLE) { score += JATS_BONUS; }
-    if node.has_flag(FLAG_HAS_METADATA) { score += METADATA_BONUS; }
+    if node.has_flag(FLAG_AUTHORIZED_FULL_TEXT) {
+        score += AUTHORIZED_BONUS;
+    }
+    if node.has_flag(FLAG_PDF_SIGNATURE_VERIFIED) {
+        score += PDF_BONUS;
+    }
+    if node.has_flag(FLAG_JATS_AVAILABLE) {
+        score += JATS_BONUS;
+    }
+    if node.has_flag(FLAG_HAS_METADATA) {
+        score += METADATA_BONUS;
+    }
     score
 }
 
@@ -68,9 +82,7 @@ pub fn score_candidates_batch(
     }
 
     for (i, score) in scores.iter_mut().enumerate().take(count) {
-        *score = citations[i] * CITATION_WEIGHT
-            + venues[i] * VENUE_WEIGHT
-            + years[i]
+        *score = citations[i] * CITATION_WEIGHT + venues[i] * VENUE_WEIGHT + years[i]
             - (sizes[i] >> 2)
             + extras[i];
     }
@@ -119,17 +131,21 @@ mod tests {
 
     #[test]
     fn simd_dispatch_matches_scalar_formula() {
-        let nodes: Vec<_> = (1..=SCORE_BATCH_SIZE).map(|i| FrontierNodeHot {
-            paper_id: i as u64,
-            citation_count: (i * 500) as u32,
-            venue_rank: i as u16,
-            year: 1990 + i as u16,
-            estimated_size_kib: (i * 1024) as u32,
-            flags: if i % 2 == 0 {
-                FLAG_AUTHORIZED_FULL_TEXT | FLAG_PDF_SIGNATURE_VERIFIED | FLAG_HAS_METADATA
-            } else { FLAG_HAS_METADATA },
-            ..FrontierNodeHot::default()
-        }).collect();
+        let nodes: Vec<_> = (1..=SCORE_BATCH_SIZE)
+            .map(|i| FrontierNodeHot {
+                paper_id: i as u64,
+                citation_count: (i * 500) as u32,
+                venue_rank: i as u16,
+                year: 1990 + i as u16,
+                estimated_size_kib: (i * 1024) as u32,
+                flags: if i % 2 == 0 {
+                    FLAG_AUTHORIZED_FULL_TEXT | FLAG_PDF_SIGNATURE_VERIFIED | FLAG_HAS_METADATA
+                } else {
+                    FLAG_HAS_METADATA
+                },
+                ..FrontierNodeHot::default()
+            })
+            .collect();
         assert_eq!(
             score_candidates_batch(&nodes, 2026, false),
             score_candidates_batch(&nodes, 2026, true)
