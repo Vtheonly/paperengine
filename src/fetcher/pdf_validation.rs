@@ -161,7 +161,9 @@ pub struct QuarantinedPdf {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PdfValidationOutcome {
     Valid(PdfValidationReport),
-    Quarantined(QuarantinedPdf),
+    /// Boxed: `QuarantinedPdf` is much larger than `PdfValidationReport`, and boxing keeps the
+    /// outcome enum small on the hot validation path.
+    Quarantined(Box<QuarantinedPdf>),
 }
 
 #[derive(Debug, Clone)]
@@ -277,7 +279,7 @@ pub fn validate_or_quarantine_pdf(
             checksums,
             reason,
         )
-        .map(PdfValidationOutcome::Quarantined);
+        .map(|quarantined| PdfValidationOutcome::Quarantined(Box::new(quarantined)));
     }
 
     let final_metadata = fs::metadata(source_path)?;
@@ -293,7 +295,7 @@ pub fn validate_or_quarantine_pdf(
                 hashed_bytes: final_metadata.len(),
             },
         )
-        .map(PdfValidationOutcome::Quarantined);
+        .map(|quarantined| PdfValidationOutcome::Quarantined(Box::new(quarantined)));
     }
 
     let checksums = checksums.expect("non-oversized input must have checksums");
@@ -578,7 +580,9 @@ fn sync_directory(path: &Path) -> Result<(), PdfValidationError> {
 mod tests {
     use super::*;
     use lopdf::dictionary;
-    use lopdf::{Dictionary, EncryptionState, EncryptionVersion, Object, Permissions, Stream};
+    use lopdf::{
+        Dictionary, EncryptionState, EncryptionVersion, Object, Permissions, Stream, StringFormat,
+    };
     use tempfile::tempdir;
 
     fn write_pdf(path: &Path) {
@@ -816,6 +820,10 @@ mod tests {
             "Pages" => pages_id,
         });
         document.trailer.set("Root", catalog_id);
+        // PDF encryption keys are derived from the file identifier; lopdf refuses to encrypt a
+        // document whose trailer has no /ID entry. Provide a deterministic 16-byte hex ID pair.
+        let file_id = Object::String(vec![0x42; 16], StringFormat::Hexadecimal);
+        document.trailer.set("ID", vec![file_id.clone(), file_id]);
         let encryption = EncryptionState::try_from(EncryptionVersion::V1 {
             document: &document,
             owner_password: "owner-password",
