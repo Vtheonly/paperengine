@@ -26,6 +26,8 @@ request_timeout_seconds = 60
 total_timeout_seconds = 600
 inter_download_delay_seconds = 1      # polite pause between consecutive downloads
 allow_http = false                    # plain http:// PDF sources are refused by default
+job_max_attempts = 3                  # fetch attempts per target URL before terminal failure (1..=10)
+job_retry_min_delay_seconds = 60      # exponential backoff floor between job attempts (1..=86400, doubles up to 1h)
 
 [extraction]
 max_text_bytes = 16777216             # extracted text persisted per object (1..=256 MiB)

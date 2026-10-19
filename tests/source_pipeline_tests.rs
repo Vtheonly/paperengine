@@ -8,6 +8,7 @@
 
 mod support;
 
+use paperengine::jobs::JobPolicy;
 use paperengine::library::{
     run_acquisition, AcquisitionOutcome, AcquisitionReportEntry, LibraryLayout,
 };
@@ -410,6 +411,7 @@ async fn end_to_end_discover_then_acquire_into_content_addressed_library() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         |entry: &AcquisitionReportEntry| {
             entries.push(serde_json::to_string(entry).unwrap());
@@ -461,13 +463,16 @@ async fn end_to_end_discover_then_acquire_into_content_addressed_library() {
     );
     assert!(manifest.acquisition.pdf_url.starts_with("http://127.0.0.1"));
 
-    // Re-running the same acquisition deduplicates to the same object.
+    // Re-running the same acquisition is gated by the durable job ledger: the work is
+    // already terminal-acquired, so no bytes are re-transferred and the run reports a
+    // skip that names the explicit re-entry flag.
     let mut second_entries = Vec::new();
     let summary = run_acquisition(
         std::iter::once(&record),
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_500,
         |entry: &AcquisitionReportEntry| {
             second_entries.push(serde_json::to_string(entry).unwrap());
@@ -476,9 +481,39 @@ async fn end_to_end_discover_then_acquire_into_content_addressed_library() {
     )
     .await
     .unwrap();
+    assert_eq!(summary.acquired, 0);
+    assert_eq!(summary.skipped, 1);
+    let entry: AcquisitionReportEntry = serde_json::from_str(&second_entries[0]).unwrap();
+    let AcquisitionOutcome::Skipped { reason } = entry.outcome else {
+        panic!("expected skip, got {:?}", entry.outcome)
+    };
+    assert!(reason.contains("--refetch"), "{reason}");
+    // No new manifest was created and no re-download happened.
+    assert_eq!(library.list_manifests().unwrap().len(), 1);
+    assert_eq!(pdf_server.request_count(), 1);
+
+    // Explicit re-entry (--refetch) re-acquires and deduplicates to the same object.
+    let mut third_entries = Vec::new();
+    let summary = run_acquisition(
+        std::iter::once(&record),
+        &library,
+        &config,
+        &downloader,
+        &JobPolicy {
+            refetch: true,
+            ..JobPolicy::default()
+        },
+        1_700_001_000,
+        |entry: &AcquisitionReportEntry| {
+            third_entries.push(serde_json::to_string(entry).unwrap());
+            Ok(())
+        },
+    )
+    .await
+    .unwrap();
     assert_eq!(summary.acquired, 1);
     assert_eq!(summary.deduplicated, 1);
-    let entry: AcquisitionReportEntry = serde_json::from_str(&second_entries[0]).unwrap();
+    let entry: AcquisitionReportEntry = serde_json::from_str(&third_entries[0]).unwrap();
     assert!(matches!(
         entry.outcome,
         AcquisitionOutcome::Acquired {
@@ -486,8 +521,10 @@ async fn end_to_end_discover_then_acquire_into_content_addressed_library() {
             ..
         }
     ));
-    // No new manifest was created for the duplicate.
+    // Still exactly one object and one manifest; the second transfer hit the wire.
+    assert_eq!(library.list_objects().unwrap().len(), 1);
     assert_eq!(library.list_manifests().unwrap().len(), 1);
+    assert_eq!(pdf_server.request_count(), 2);
 }
 
 #[tokio::test]
@@ -517,6 +554,7 @@ async fn html_payload_is_quarantined_and_never_finalized() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         |entry: &AcquisitionReportEntry| {
             entries.push(serde_json::to_string(entry).unwrap());
@@ -570,6 +608,7 @@ async fn policy_gate_rejects_disallowed_schemes_and_urls_without_payloads() {
         &library,
         &strict_config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         |entry: &AcquisitionReportEntry| {
             entries.push(serde_json::to_string(entry).unwrap());
@@ -627,6 +666,7 @@ async fn download_budget_bounds_the_run_and_reports_exhaustion() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         |entry: &AcquisitionReportEntry| {
             entries.push(serde_json::to_string(entry).unwrap());

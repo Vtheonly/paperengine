@@ -120,12 +120,25 @@ bounded per-page notes. Completed extractions are skipped on re-run; `--force`
 re-extracts and produces byte-identical text. Failures are retried on the next run.
 A per-run report lands in `research-library/reports/`.
 
-### Recovery
+### Recovery and the durable job ledger
 
-`acquire` is restartable: objects are content-addressed and never clobbered, identical
-re-downloads deduplicate, and interrupted transfers leave at most a scratch file under
-`tmp/` that the next run clears before retrying. Failed and quarantined items keep their
-records in `reports/` and `quarantine/` respectively.
+`acquire` is restartable and every work record gets a durable job record under
+`library/jobs/` (one atomically-published JSON per job). The ledger decides whether the
+network is touched at all:
+
+- Terminal jobs (`acquired`, `quarantined`, `failed_permanent`, `skipped`) are re-entered
+  only with `--refetch` or when a new discovery observation changes the target URL.
+- Transient and rate-limited failures back off exponentially
+  (`acquisition.job_retry_min_delay_seconds`, doubling up to one hour) with bounded
+  attempts (`acquisition.job_max_attempts`); exhaustion is a terminal failure.
+- A crash mid-flight leaves the job in an in-flight state with a lease; the next run
+  recovers it once the lease lapses, deduplicates against the existing object, and
+  completes finalization. A job whose lease is still live is never touched by a second run.
+
+Objects are content-addressed and never clobbered, identical re-downloads deduplicate,
+and interrupted transfers leave at most a scratch file under `tmp/` that the next run
+clears before retrying. `paperengine inspect` reports job counts by state; failed and
+quarantined items keep their records in `reports/` and `quarantine/` respectively.
 
 ## Google Colab
 

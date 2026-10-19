@@ -12,6 +12,7 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     let objects = library.list_objects()?;
     let manifests = library.list_manifests()?;
     let unattributed = library.unattributed_objects()?;
+    let job_counts = paperengine::jobs::JobLedger::new(&library).counts_by_state()?;
 
     if flags.has("json") {
         let summary = serde_json::json!({
@@ -33,6 +34,7 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
                     "bytes": length,
                 }))
                 .collect::<Vec<_>>(),
+            "job_counts_by_state": job_counts,
         });
         println!("{}", serde_json::to_string_pretty(&summary)?);
         return Ok(());
@@ -77,6 +79,13 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
         println!("  re-run `acquire` for the same records to link them, or delete them)");
         for (path, length) in &unattributed {
             println!("  {:>10}  {}", human_bytes(*length), path.display());
+        }
+    }
+    if !job_counts.is_empty() {
+        println!();
+        println!("job ledger (durable acquisition states):");
+        for (state, count) in &job_counts {
+            println!("  {count:>6}  {state}");
         }
     }
     Ok(())

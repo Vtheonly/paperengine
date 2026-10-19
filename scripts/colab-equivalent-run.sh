@@ -89,9 +89,13 @@ acquire_once() {
       --max-downloads 2
 }
 if ! acquire_once; then
-  echo "transient acquisition failure; one polite retry after 5s…"
+  echo "transient acquisition failure; one polite retry after 5s (--refetch overrides the job backoff)…"
   sleep 5
-  acquire_once
+  ./target/release/paperengine acquire \
+      --from discovery.jsonl \
+      --library ./research-library \
+      --max-downloads 2 \
+      --refetch
 fi
 
 echo "== [cell 7] inspect library and report =="

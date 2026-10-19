@@ -369,3 +369,54 @@ server; each test constructs the exact on-disk state a crash at that boundary le
 
 CLI smoke (executed): a library containing an object without a manifest reports
 `unattributed objects: 1` in both text and `--json` output of `paperengine inspect`.
+
+## Durable job ledger and state machine (issue #6) — 2026-10-19
+
+Environment: Linux x86-64 (Debian 13), rustc 1.99.1, 2 vCPU. Every acquisition job now has
+a durable record under `library/jobs/<source>-<record>.json`, published atomically
+(pending → fsync → rename → dir sync, the same pattern as provenance manifests). The
+state machine is pure (`src/jobs.rs`); the ledger is outer I/O; the computational kernel
+is untouched.
+
+Commands (all executed, all passing):
+
+```bash
+cargo fmt --all -- --check                                  # pass
+cargo clippy --all-targets --all-features -- -D warnings    # pass
+cargo test --all-features                                   # 158 unit + 40 integration, 0 failed, 27 live ignored
+cargo build --release                                       # pass
+cargo test --test job_ledger_tests -- --nocapture           # 6 passed, 0 failed
+```
+
+State-machine evidence (unit tests in `src/jobs.rs`): the full legal lifecycle
+(discovered → fetching → validating → storing → acquired → extracted → indexed, the last
+two reserved for the extraction/indexing pipelines), failure paths from every in-flight
+state, quarantine only from validation, due-retry and budget-exhaustion transitions,
+invalid transitions rejected (stage skipping, backwards moves, terminal forward moves,
+terminal self-transitions), terminal re-entry only via explicit consent or a changed
+target URL, in-flight recovery requiring a lapsed lease, in-flight self-transition as a
+lease refresh, attempt counting/reset semantics, exponential backoff with cap, error
+classification of every `DownloadError` variant (429 → rate_limited, 404/410 →
+not_found, 401/403 → auth_restricted, 5xx/transport/timeout → transient, size bounds →
+permanent, invalid signature → corrupt), and gate behavior for terminal jobs, backoff
+deadlines, live leases, and changed targets.
+
+Restart/retry evidence (`tests/job_ledger_tests.rs`, offline, production pipeline with an
+injected clock):
+
+| Scenario | Test | Observed result |
+|---|---|---|
+| Transient failure → backoff → due retry recovers | `retryable_failure_backs_off_then_recovers_when_due` | run 1 (500) → `failed_retryable`, attempts=1, next_retry=+60s; immediate re-run skipped with `retry not due until 1060` and **zero** requests; run at t=2000 acquired, attempts=2, terminal `acquired`, no lease |
+| Bounded attempts and explicit re-entry | `attempts_are_bounded_and_terminal_failure_requires_refetch` | with max_attempts=2: attempt 2 fails → `failed_permanent` with `retry budget exhausted after 2 attempts`; next run skips naming `--refetch` with zero requests; `--refetch` run restarts the attempt series (attempts=1) and acquires |
+| Crash mid-flight, restart after lease expiry | `restart_recovers_abandoned_in_flight_job_after_lease_expiry` | planted in-flight job (lapsed lease, attempts=1) + torn scratch: restart acquires, clears the scratch, keeps attempts=1 (restart recovery is not a new scheduled attempt) |
+| Live lease exclusion | `live_lease_blocks_a_second_run` | a job with a lease expiring in the future blocks a second run: skip names the owner, zero requests, lease undisturbed |
+| Changed target URL re-opens a terminal job | `changed_target_url_reopens_acquired_job` | an `acquired` job re-observed at a new URL re-opens without the flag, dedups against the shared object, records the new target with a restarted attempt series |
+| Ledger durability | `ledger_round_trips_and_reports_counts` | records round-trip byte-exact; counts-by-state; unsupported schema versions fail with a named error; stale `.pending` siblings ignored; exactly N `.json` files after publications |
+
+CLI smoke (executed, release binary): a record whose target genuinely returned HTTP 404
+(arxiv.org, single request) classified `not_found`/permanent and the next run refused
+re-entry without `--refetch`; a connection-refused target classified `transient` with
+`next attempt after <now+3600>` (configured floor); an immediate re-run skipped with
+`retry not due`; `--refetch` overrode the backoff, consumed the second attempt, then
+exhausted the budget to terminal failure; a further `--refetch` restarted the series.
+`paperengine inspect` prints the job ledger counts by state.

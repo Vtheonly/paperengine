@@ -26,6 +26,8 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
         config.acquisition.allow_http = true;
     }
     config.validate()?;
+    let refetch = flags.has("refetch");
+    let job_policy = config.job_policy(refetch);
 
     let input = flags.require("from")?;
     let library_dir = flags
@@ -73,6 +75,7 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
             &library,
             &acquisition_config,
             &downloader,
+            &job_policy,
             now,
             |entry: &AcquisitionReportEntry| {
                 let line = serde_json::to_string(entry)?;
@@ -97,5 +100,22 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
     if summary.download_budget_exhausted {
         eprintln!("note: run budget exhausted; re-run to continue with remaining records");
     }
+    eprintln!(
+        "job ledger: {} (durable states under {})",
+        summary_job_summary(&library),
+        library.jobs_dir().display()
+    );
     Ok(())
+}
+
+fn summary_job_summary(library: &LibraryLayout) -> String {
+    match paperengine::jobs::JobLedger::new(library).counts_by_state() {
+        Ok(counts) if counts.is_empty() => "no jobs yet".to_owned(),
+        Ok(counts) => counts
+            .into_iter()
+            .map(|(state, count)| format!("{state}={count}"))
+            .collect::<Vec<_>>()
+            .join(", "),
+        Err(error) => format!("unreadable: {error}"),
+    }
 }

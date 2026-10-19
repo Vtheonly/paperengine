@@ -39,6 +39,10 @@ use crate::fetcher::pdf_validation::{
     validate_or_quarantine_pdf, PdfValidationConfig, PdfValidationContext, PdfValidationOutcome,
 };
 use crate::fetcher::stream::{DownloadConfig, DownloadError, DownloadResult, ResumableDownloader};
+use crate::jobs::{
+    classify_download_error, lease_expiry, lease_owner, plan_job_action, JobAction, JobErrorClass,
+    JobLedger, JobPolicy, JobRecord, JobState,
+};
 use crate::sources::work_record::WorkRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -201,6 +205,11 @@ impl LibraryLayout {
         self.root.join("extraction")
     }
 
+    /// Durable acquisition job records (#6): one atomically-published JSON per job.
+    pub fn jobs_dir(&self) -> PathBuf {
+        self.root.join("jobs")
+    }
+
     /// Create the directory skeleton. Idempotent.
     pub fn create(&self) -> Result<(), LibraryError> {
         for directory in [
@@ -212,6 +221,7 @@ impl LibraryLayout {
             self.tmp_dir(),
             self.extracted_dir(),
             self.extraction_dir(),
+            self.jobs_dir(),
         ] {
             fs::create_dir_all(directory)?;
         }
@@ -337,7 +347,7 @@ impl LibraryLayout {
     }
 }
 
-fn sanitize_stem(raw: &str) -> String {
+pub fn sanitize_stem(raw: &str) -> String {
     let mut sanitized: String = raw
         .chars()
         .map(|c| {
@@ -495,14 +505,21 @@ impl RunBudget {
     }
 }
 
-/// Acquire one work record: policy gate, bounded download, structural validation, and
-/// durable content-addressed storage with provenance.
+/// Acquire one work record: durable job gate, policy re-check, bounded download,
+/// structural validation, and content-addressed storage with provenance.
+///
+/// The job ledger (#6) decides whether the network is touched at all: terminal jobs
+/// skip unless explicitly re-entered (`--refetch`) or re-targeted, due retries proceed,
+/// and abandoned in-flight jobs recover only after their lease expires.
+#[allow(clippy::too_many_arguments)]
 async fn acquire_work(
     record: &WorkRecord,
     library: &LibraryLayout,
     config: &AcquisitionConfig,
     downloader: &ResumableDownloader,
     budget: &mut RunBudget,
+    ledger: &JobLedger,
+    policy: &JobPolicy,
     now_unix_seconds: u64,
 ) -> AcquisitionReportEntry {
     let entry = |outcome: AcquisitionOutcome| AcquisitionReportEntry {
@@ -517,20 +534,60 @@ async fn acquire_work(
         outcome,
     };
 
-    let Some(pdf_url) = record.oa_pdf_url.as_deref() else {
-        return entry(AcquisitionOutcome::Skipped {
-            reason: "no direct OA PDF URL reported by the source".to_owned(),
-        });
+    // Durable job gate: load-or-create, then decide.
+    let loaded = ledger.load(&record.source_id, &record.source_record_id);
+    let loaded = match loaded {
+        Ok(job) => job,
+        Err(error) => {
+            return entry(AcquisitionOutcome::Failed {
+                stage: "job-ledger".to_owned(),
+                detail: error.to_string(),
+            })
+        }
     };
+    let job = loaded.unwrap_or_else(|| {
+        JobRecord::new(
+            &record.source_id,
+            &record.source_record_id,
+            "",
+            now_unix_seconds,
+        )
+    });
+    let target = record.oa_pdf_url.as_deref().map(strip_url_credentials);
+    let mut job = match plan_job_action(job, target.as_deref(), policy, now_unix_seconds) {
+        JobAction::Skip(job, reason) => {
+            // Persist state changes made by the gate (e.g. Discovered → Skipped).
+            if let Err(error) = ledger.store(&job) {
+                return entry(AcquisitionOutcome::Failed {
+                    stage: "job-ledger".to_owned(),
+                    detail: error.to_string(),
+                });
+            }
+            return entry(AcquisitionOutcome::Skipped { reason });
+        }
+        JobAction::Proceed(job) => job,
+    };
+    job.target_url = target.unwrap_or_default();
 
     // Policy re-check immediately before the request.
-    if let Err(rejection) = authorize_url(pdf_url, config.allow_http) {
+    if let Err(rejection) = authorize_url(
+        record.oa_pdf_url.as_deref().unwrap_or(""),
+        config.allow_http,
+    ) {
+        let _ = job.advance(
+            JobState::Skipped,
+            &crate::jobs::TransitionContext::default(),
+            now_unix_seconds,
+        );
+        let _ = ledger.store(&job);
         return entry(AcquisitionOutcome::Skipped {
             reason: format!("policy rejected URL: {rejection}"),
         });
     }
 
     if budget.exhausted() {
+        // A budget skip is a property of this run, not an outcome of the work: the
+        // in-memory Fetching transition is deliberately not persisted.
         return entry(AcquisitionOutcome::Skipped {
             reason: "run budget exhausted".to_owned(),
         });
@@ -543,26 +600,54 @@ async fn acquire_work(
         let _ = fs::remove_file(&scratch);
     }
 
-    let transfer: Result<DownloadResult, DownloadError> =
-        downloader.download(pdf_url, &scratch).await;
+    // Persist the in-flight state with a lease right before the transfer starts.
+    job.lease = Some(crate::jobs::JobLease {
+        owner: lease_owner(now_unix_seconds),
+        expires_unix_seconds: lease_expiry(now_unix_seconds, config.total_timeout),
+    });
+    if let Err(error) = ledger.store(&job) {
+        return entry(AcquisitionOutcome::Failed {
+            stage: "job-ledger".to_owned(),
+            detail: error.to_string(),
+        });
+    }
+
+    let transfer: Result<DownloadResult, DownloadError> = downloader
+        .download(record.oa_pdf_url.as_deref().unwrap_or(""), &scratch)
+        .await;
     let transfer = match transfer {
         Ok(transfer) => transfer,
         Err(error) => {
+            let detail = record_job_failure(
+                &mut job,
+                classify_download_error(&error),
+                &error.to_string(),
+                policy,
+                now_unix_seconds,
+            );
+            let _ = ledger.store(&job);
             return entry(AcquisitionOutcome::Failed {
                 stage: "download".to_owned(),
-                detail: error.to_string(),
-            })
+                detail,
+            });
         }
     };
 
     budget.downloads_left -= 1;
     budget.bytes_left = budget.bytes_left.saturating_sub(transfer.bytes);
 
+    let _ = job.advance(
+        JobState::Validating,
+        &crate::jobs::TransitionContext::default(),
+        now_unix_seconds,
+    );
+    let _ = ledger.store(&job);
+
     let validation = validate_or_quarantine_pdf(
         &scratch,
         library.quarantine_dir(),
         PdfValidationContext {
-            source_url: Some(pdf_url.to_owned()),
+            source_url: record.oa_pdf_url.clone(),
             declared_content_type: None,
             expected_blake3_hex: None,
             expected_sha256_hex: None,
@@ -573,11 +658,30 @@ async fn acquire_work(
         },
     );
     match validation {
-        Err(error) => entry(AcquisitionOutcome::Failed {
-            stage: "validation".to_owned(),
-            detail: error.to_string(),
-        }),
+        Err(error) => {
+            let detail = record_job_failure(
+                &mut job,
+                JobErrorClass::Transient,
+                &error.to_string(),
+                policy,
+                now_unix_seconds,
+            );
+            let _ = ledger.store(&job);
+            entry(AcquisitionOutcome::Failed {
+                stage: "validation".to_owned(),
+                detail,
+            })
+        }
         Ok(PdfValidationOutcome::Quarantined(quarantined)) => {
+            let _ = job.advance(
+                JobState::Quarantined,
+                &crate::jobs::TransitionContext::default(),
+                now_unix_seconds,
+            );
+            job.last_error_class = Some(JobErrorClass::Corrupt);
+            job.last_error_detail =
+                Some(serde_json::to_string(&quarantined.manifest.reason).unwrap_or_default());
+            let _ = ledger.store(&job);
             entry(AcquisitionOutcome::Quarantined {
                 reason: serde_json::to_value(&quarantined.manifest.reason).unwrap_or_default(),
                 quarantined_path: quarantined.quarantined_path.to_string_lossy().into_owned(),
@@ -585,8 +689,27 @@ async fn acquire_work(
             })
         }
         Ok(PdfValidationOutcome::Valid(report)) => {
-            match finalize_object(library, record, pdf_url, &report, now_unix_seconds) {
+            let _ = job.advance(
+                JobState::Storing,
+                &crate::jobs::TransitionContext::default(),
+                now_unix_seconds,
+            );
+            let _ = ledger.store(&job);
+            match finalize_object(
+                library,
+                record,
+                record.oa_pdf_url.as_deref().unwrap_or(""),
+                &report,
+                now_unix_seconds,
+            ) {
                 Ok((object_path, manifest_path, deduplicated)) => {
+                    let _ = job.advance(
+                        JobState::Acquired,
+                        &crate::jobs::TransitionContext::default(),
+                        now_unix_seconds,
+                    );
+                    job.acquired_sha256_hex = Some(report.sha256_hex.clone());
+                    let _ = ledger.store(&job);
                     entry(AcquisitionOutcome::Acquired {
                         deduplicated,
                         byte_length: report.byte_length,
@@ -597,12 +720,62 @@ async fn acquire_work(
                         manifest_path: manifest_path.to_string_lossy().into_owned(),
                     })
                 }
-                Err(error) => entry(AcquisitionOutcome::Failed {
-                    stage: "storage".to_owned(),
-                    detail: error.to_string(),
-                }),
+                Err(error) => {
+                    let detail = record_job_failure(
+                        &mut job,
+                        JobErrorClass::Transient,
+                        &error.to_string(),
+                        policy,
+                        now_unix_seconds,
+                    );
+                    let _ = ledger.store(&job);
+                    entry(AcquisitionOutcome::Failed {
+                        stage: "storage".to_owned(),
+                        detail,
+                    })
+                }
             }
         }
+    }
+}
+
+/// Apply the retry policy to a failure and return the report detail.
+fn record_job_failure(
+    job: &mut JobRecord,
+    class: JobErrorClass,
+    detail: &str,
+    policy: &JobPolicy,
+    now_unix_seconds: u64,
+) -> String {
+    if class.is_retryable() && job.attempts < policy.max_attempts {
+        let _ = job.fail_retryable(
+            class,
+            detail,
+            policy.retry_min_delay_seconds,
+            now_unix_seconds,
+        );
+        format!(
+            "{detail}; retryable ({}), next attempt after {}",
+            class.as_str(),
+            job.next_retry_unix_seconds.unwrap_or(now_unix_seconds)
+        )
+    } else {
+        let suffix = if class.is_retryable() {
+            format!(
+                "; retry budget exhausted after {} attempt{} (class {})",
+                job.attempts,
+                if job.attempts == 1 { "" } else { "s" },
+                class.as_str()
+            )
+        } else {
+            format!(
+                "; permanent ({}), re-run with --refetch to re-enter",
+                class.as_str()
+            )
+        };
+        let combined = format!("{detail}{suffix}");
+        let _ = job.fail_permanent(class, &combined, now_unix_seconds);
+        combined
     }
 }
 
@@ -725,6 +898,7 @@ pub async fn run_acquisition<'a, I>(
     library: &LibraryLayout,
     config: &AcquisitionConfig,
     downloader: &ResumableDownloader,
+    job_policy: &JobPolicy,
     now_unix_seconds: u64,
     mut on_entry: impl FnMut(&AcquisitionReportEntry) -> Result<(), io::Error>,
 ) -> Result<AcquisitionRunSummary, LibraryError>
@@ -733,6 +907,7 @@ where
 {
     config.validate()?;
     library.create()?;
+    let ledger = JobLedger::new(library);
 
     let mut budget = RunBudget {
         downloads_left: config.max_downloads,
@@ -768,6 +943,8 @@ where
             config,
             downloader,
             &mut budget,
+            &ledger,
+            job_policy,
             now_unix_seconds,
         )
         .await;

@@ -145,6 +145,7 @@ async fn live_arxiv_end_to_end_pdf_acquisition() {
         &library,
         &config,
         &downloader,
+        &paperengine::jobs::JobPolicy::default(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -467,6 +468,7 @@ async fn live_europepmc_end_to_end_pdf_acquisition_or_blocked() {
         &library,
         &config,
         &downloader,
+        &paperengine::jobs::JobPolicy::default(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -607,6 +609,7 @@ async fn acquire_one_real_pdf(record: &paperengine::sources::WorkRecord, source_
         &library,
         &config,
         &downloader,
+        &paperengine::jobs::JobPolicy::default(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

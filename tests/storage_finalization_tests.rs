@@ -12,6 +12,7 @@
 
 mod support;
 
+use paperengine::jobs::{JobLedger, JobPolicy, JobState};
 use paperengine::library::{
     run_acquisition, AcquisitionOutcome, AcquisitionReportEntry, LibraryError, LibraryLayout,
     ProvenanceManifest, LIBRARY_SCHEMA_VERSION,
@@ -76,6 +77,7 @@ async fn crash_during_transfer_leaves_only_scratch_and_next_run_recovers() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         push_entry(&mut entries),
     )
@@ -141,6 +143,7 @@ async fn crash_between_object_rename_and_manifest_is_visible_and_recoverable() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         push_entry(&mut entries),
     )
@@ -159,7 +162,8 @@ async fn crash_between_object_rename_and_manifest_is_visible_and_recoverable() {
     let object_path = Path::new(&object_path).to_path_buf();
     assert!(library.unattributed_objects().unwrap().is_empty());
 
-    // Simulate the crash boundary: the manifest never made it to disk.
+    // Simulate the crash boundary: the manifest never made it to disk and the durable
+    // job record never advanced past the in-flight `storing` state (its lease lapsed).
     let manifests_before = library.list_manifests().unwrap();
     assert_eq!(manifests_before.len(), 1);
     let manifest_file = library
@@ -171,6 +175,12 @@ async fn crash_between_object_rename_and_manifest_is_visible_and_recoverable() {
         .unwrap()
         .path();
     fs::remove_file(&manifest_file).unwrap();
+    let ledger = JobLedger::new(&library);
+    let mut crashed_job = ledger.load("arxiv", "2401.00002").unwrap().unwrap();
+    assert_eq!(crashed_job.state, JobState::Acquired);
+    crashed_job.state = JobState::Storing;
+    crashed_job.lease = None;
+    ledger.store(&crashed_job).unwrap();
 
     // The object is now explicitly reported as unattributed — an interrupted run is
     // never presented as a complete acquisition.
@@ -185,6 +195,7 @@ async fn crash_between_object_rename_and_manifest_is_visible_and_recoverable() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_500,
         push_entry(&mut recovery),
     )
@@ -201,6 +212,15 @@ async fn crash_between_object_rename_and_manifest_is_visible_and_recoverable() {
     let objects = library.list_objects().unwrap();
     assert_eq!(objects.len(), 1);
     assert!(library.unattributed_objects().unwrap().is_empty());
+    // The durable job recovered to the acquired terminal state without counting a
+    // second scheduled attempt (restart recovery, not a policy retry).
+    let recovered_job = ledger.load("arxiv", "2401.00002").unwrap().unwrap();
+    assert_eq!(recovered_job.state, JobState::Acquired);
+    assert_eq!(recovered_job.attempts, 1);
+    assert_eq!(
+        recovered_job.acquired_sha256_hex.as_deref(),
+        Some(sha256_hex.as_str())
+    );
 }
 
 /// Boundary 3 — manifest publication itself: the provenance JSON is written to a
@@ -299,6 +319,7 @@ async fn duplicate_content_across_distinct_works_shares_one_object() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         push_entry(&mut entries),
     )
@@ -367,6 +388,7 @@ async fn finalized_object_reopens_with_real_parser_and_matches_its_address() {
         &library,
         &config,
         &downloader,
+        &JobPolicy::default(),
         1_700_000_000,
         push_entry(&mut entries),
     )

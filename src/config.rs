@@ -86,6 +86,12 @@ pub struct AcquisitionSettings {
     pub total_timeout_seconds: u64,
     pub inter_download_delay_seconds: u64,
     pub allow_http: bool,
+    /// Maximum fetch attempts against one target URL before the job fails
+    /// permanently (#6). 1..=10.
+    pub job_max_attempts: u32,
+    /// Floor for the exponential retry delay between job attempts, in seconds.
+    /// 1..=86400; the delay doubles per attempt up to one hour.
+    pub job_retry_min_delay_seconds: u64,
 }
 
 impl Default for AcquisitionSettings {
@@ -98,6 +104,8 @@ impl Default for AcquisitionSettings {
             total_timeout_seconds: 600,
             inter_download_delay_seconds: 1,
             allow_http: false,
+            job_max_attempts: 3,
+            job_retry_min_delay_seconds: 60,
         }
     }
 }
@@ -189,6 +197,16 @@ impl PaperEngineConfig {
                 "acquisition timeouts must be positive and total >= per-request".into(),
             ));
         }
+        if a.job_max_attempts == 0 || a.job_max_attempts > 10 {
+            return Err(ConfigError::Invalid(
+                "acquisition.job_max_attempts must be between 1 and 10".into(),
+            ));
+        }
+        if a.job_retry_min_delay_seconds == 0 || a.job_retry_min_delay_seconds > 86_400 {
+            return Err(ConfigError::Invalid(
+                "acquisition.job_retry_min_delay_seconds must be between 1 and 86400".into(),
+            ));
+        }
         let e = &self.extraction;
         if e.max_text_bytes == 0 || e.max_text_bytes > 256 * 1024 * 1024 {
             return Err(ConfigError::Invalid(
@@ -241,6 +259,15 @@ impl PaperEngineConfig {
             max_objects: self.extraction.max_objects,
         }
     }
+
+    /// Durable job policy (#6) derived from the validated acquisition settings.
+    pub fn job_policy(&self, refetch: bool) -> crate::jobs::JobPolicy {
+        crate::jobs::JobPolicy {
+            max_attempts: self.acquisition.job_max_attempts,
+            retry_min_delay_seconds: self.acquisition.job_retry_min_delay_seconds,
+            refetch,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -250,6 +277,34 @@ mod tests {
     #[test]
     fn defaults_validate() {
         assert!(PaperEngineConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn job_retry_bounds_are_validated() {
+        for invalid in [0_u32, 11] {
+            let config = PaperEngineConfig {
+                acquisition: AcquisitionSettings {
+                    job_max_attempts: invalid,
+                    ..AcquisitionSettings::default()
+                },
+                ..PaperEngineConfig::default()
+            };
+            assert!(config.validate().is_err(), "attempts {invalid} must fail");
+        }
+        for invalid in [0_u64, 86_401] {
+            let config = PaperEngineConfig {
+                acquisition: AcquisitionSettings {
+                    job_retry_min_delay_seconds: invalid,
+                    ..AcquisitionSettings::default()
+                },
+                ..PaperEngineConfig::default()
+            };
+            assert!(config.validate().is_err(), "delay {invalid} must fail");
+        }
+        let policy = PaperEngineConfig::default().job_policy(true);
+        assert_eq!(policy.max_attempts, 3);
+        assert_eq!(policy.retry_min_delay_seconds, 60);
+        assert!(policy.refetch);
     }
 
     #[test]
