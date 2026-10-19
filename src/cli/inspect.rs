@@ -11,6 +11,7 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
 
     let objects = library.list_objects()?;
     let manifests = library.list_manifests()?;
+    let unattributed = library.unattributed_objects()?;
 
     if flags.has("json") {
         let summary = serde_json::json!({
@@ -25,6 +26,13 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
                 }))
                 .collect::<Vec<_>>(),
             "manifests": manifests,
+            "unattributed_objects": unattributed
+                .iter()
+                .map(|(path, length)| serde_json::json!({
+                    "path": path.to_string_lossy(),
+                    "bytes": length,
+                }))
+                .collect::<Vec<_>>(),
         });
         println!("{}", serde_json::to_string_pretty(&summary)?);
         return Ok(());
@@ -59,6 +67,17 @@ pub fn run(args: impl Iterator<Item = String>) -> Result<(), Box<dyn Error>> {
             manifest.content.page_count,
             &manifest.content.sha256_hex[..12.min(manifest.content.sha256_hex.len())]
         );
+    }
+    if !unattributed.is_empty() {
+        println!();
+        println!(
+            "unattributed objects: {} (validated bytes without a provenance manifest;",
+            unattributed.len()
+        );
+        println!("  re-run `acquire` for the same records to link them, or delete them)");
+        for (path, length) in &unattributed {
+            println!("  {:>10}  {}", human_bytes(*length), path.display());
+        }
     }
     Ok(())
 }

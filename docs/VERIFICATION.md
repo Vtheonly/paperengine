@@ -334,3 +334,38 @@ cargo build --release               # pass
 
 CI on the exact commit: [39243321210](https://github.com/Vtheonly/paperengine/actions/runs/39243321210)
 success for 23352af.
+## Storage finalization crash boundaries (issue #29) — 2026-10-19
+
+Environment: Linux x86-64 (Debian 13), rustc 1.99.1, 2 vCPU. Finalization crosses three
+boundaries: (1) payload scratch under `tmp/` (fsynced by the downloader before
+`finalize_object` runs), (2) the atomic object rename into
+`objects/<sha256[0..2]>/<sha256>.pdf` plus parent-directory sync, and (3) provenance
+manifest publication. In this change, boundary (3) was hardened from a direct
+`fs::write` to the pending-file → fsync → rename → directory-sync pattern (the same
+idiom the quarantine path already used), and a crash between boundaries (2) and (3)
+was made explicitly visible.
+
+Commands (all executed, all passing):
+
+```bash
+cargo fmt --all -- --check                                  # pass
+cargo clippy --all-targets --all-features -- -D warnings    # pass
+cargo test --all-features                                   # 144 unit + 34 integration, 0 failed, 27 live ignored (final merged tree including the concurrent #31 extraction slice)
+cargo build --release                                       # pass
+cargo test --test storage_finalization_tests -- --nocapture # 6 passed, 0 failed
+```
+
+Boundary evidence in `tests/storage_finalization_tests.rs` (offline, local fixture
+server; each test constructs the exact on-disk state a crash at that boundary leaves):
+
+| Boundary simulated | Test | Observed result |
+|---|---|---|
+| Crash during transfer (stale scratch under `tmp/`, no object) | `crash_during_transfer_leaves_only_scratch_and_next_run_recovers` | next run clears the stale scratch, transfers fresh bytes, finalizes exactly one object matching the fixture sha256; `tmp/` empty afterwards; no unattributed objects |
+| Crash between object rename and manifest write (object present, manifest absent) | `crash_between_object_rename_and_manifest_is_visible_and_recoverable` | the state is reported by `LibraryLayout::unattributed_objects` and by `paperengine inspect`; re-acquiring the record deduplicates against the existing object (summary `deduplicated=1`), rewrites the missing manifest, leaves object bytes unchanged, and clears the orphan report |
+| Crash during manifest publication itself | `manifest_publication_is_atomic_and_pending_leftovers_are_ignored` | publication lands atomically (no `.pending` remnant, manifest parses); a stale `.pending` sibling is ignored by readers and cleared by the next publication; `manifests/` contains exactly one `.json` |
+| Duplicate content across distinct works | `duplicate_content_across_distinct_works_shares_one_object` | two records with byte-identical payloads share one content-addressed object; two provenance manifests; second outcome reports `deduplicated=true`; summary `{acquired: 2, deduplicated: 1}`; no orphans |
+| Finalized object reopenability | `finalized_object_reopens_with_real_parser_and_matches_its_address` | stored bytes hash to their content address; the production validator accepts the object from its final path; lopdf independently re-opens it |
+| Externally corrupted manifest (not producible by the production path anymore) | `externally_corrupted_manifest_is_surfaced_with_its_path` | `list_manifests` fails with an error naming the offending file instead of silently skipping it |
+
+CLI smoke (executed): a library containing an object without a manifest reports
+`unattributed objects: 1` in both text and `--json` output of `paperengine inspect`.

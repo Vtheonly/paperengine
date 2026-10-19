@@ -16,6 +16,24 @@
 //! A download is reported as acquired only after the payload passed structural PDF
 //! validation and the object plus its provenance manifest were finalized. Interrupted or
 //! invalid transfers leave at most a scratch file; they never appear under `objects/`.
+//!
+//! # Crash safety of finalization
+//!
+//! The payload is fsynced by the downloader before `finalize_object` runs. Publication
+//! then crosses two boundaries, each crash-safe:
+//!
+//! 1. **Object rename**: scratch → `objects/<sha>.pdf` by atomic same-filesystem rename,
+//!    followed by a parent-directory sync. A crash before the rename leaves only scratch
+//!    under `tmp/`, which the next run clears; the object never exists half-written.
+//! 2. **Manifest publication**: provenance is written to a `.pending` sibling, fsynced,
+//!    and renamed into place. A crash can only leave a complete manifest or a `.pending`
+//!    file that readers ignore — never a torn JSON document.
+//!
+//! A crash *between* the two boundaries leaves an unattributed object: validated,
+//! content-addressed bytes with no provenance yet. [`LibraryLayout::unattributed_objects`]
+//! surfaces exactly those so an interrupted run is visible as incomplete rather than
+//! silently counted as an acquisition; re-acquiring the record deduplicates against the
+//! existing object and writes the missing manifest.
 
 use crate::fetcher::pdf_validation::{
     validate_or_quarantine_pdf, PdfValidationConfig, PdfValidationContext, PdfValidationOutcome,
@@ -23,8 +41,9 @@ use crate::fetcher::pdf_validation::{
 use crate::fetcher::stream::{DownloadConfig, DownloadError, DownloadResult, ResumableDownloader};
 use crate::sources::work_record::WorkRecord;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use thiserror::Error;
@@ -277,12 +296,44 @@ impl LibraryLayout {
             match serde_json::from_str(&content) {
                 Ok(manifest) => manifests.push(manifest),
                 Err(error) => {
-                    return Err(LibraryError::Manifest(error));
+                    return Err(LibraryError::InvalidLayout(format!(
+                        "provenance manifest {} is not valid JSON: {error}",
+                        path.display()
+                    )));
                 }
             }
         }
         manifests.sort_by(|a, b| a.work.title.cmp(&b.work.title));
         Ok(manifests)
+    }
+
+    /// Objects present under `objects/` whose content hash has no provenance manifest.
+    ///
+    /// These appear when a crash interrupts finalization between the object rename and
+    /// manifest publication: the bytes are validated and content-addressed, but the
+    /// library cannot attribute them to a work until a later run re-acquires the record
+    /// and writes the missing manifest. Surfacing them keeps an interrupted run honest —
+    /// an unattributed object is visible as such instead of silently counting as a
+    /// complete acquisition.
+    pub fn unattributed_objects(&self) -> Result<Vec<(PathBuf, u64)>, LibraryError> {
+        let attributed: HashSet<String> = self
+            .list_manifests()?
+            .into_iter()
+            .map(|manifest| manifest.content.sha256_hex.to_ascii_lowercase())
+            .collect();
+        let mut orphans = Vec::new();
+        for (path, length) in self.list_objects()? {
+            let stem = path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            if !attributed.contains(&stem) {
+                orphans.push((path, length));
+            }
+        }
+        orphans.sort();
+        Ok(orphans)
     }
 }
 
@@ -618,12 +669,48 @@ fn finalize_object(
         fs::create_dir_all(parent)?;
     }
     let serialized = serde_json::to_vec_pretty(&manifest)?;
-    fs::write(&manifest_path, serialized)?;
-    if let Some(parent) = manifest_path.parent() {
-        sync_directory(parent)?;
-    }
+    publish_bytes_atomically(&manifest_path, &serialized)?;
 
     Ok((object_path, manifest_path, deduplicated))
+}
+
+/// Publish `bytes` at `path` atomically: write to a sibling `.pending` file, sync it,
+/// rename over the destination, then sync the parent directory.
+///
+/// A crash at any point leaves either the previous content or the complete new content
+/// at `path`; a torn write can only ever exist under the `.pending` sibling name, which
+/// readers ignore. This is the same publication pattern the quarantine path uses.
+pub fn publish_bytes_atomically(path: &Path, bytes: &[u8]) -> Result<(), LibraryError> {
+    let pending = append_suffix(path, ".pending");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+        // Clear a stale pending file left by an interrupted earlier publication.
+        let _ = fs::remove_file(&pending);
+    }
+    let mut file = fs::File::create(&pending)?;
+    if let Err(error) = file.write_all(bytes) {
+        let _ = fs::remove_file(&pending);
+        return Err(error.into());
+    }
+    if let Err(error) = file.sync_all() {
+        let _ = fs::remove_file(&pending);
+        return Err(error.into());
+    }
+    drop(file);
+    if let Err(error) = fs::rename(&pending, path) {
+        let _ = fs::remove_file(&pending);
+        return Err(error.into());
+    }
+    if let Some(parent) = path.parent() {
+        sync_directory(parent)?;
+    }
+    Ok(())
+}
+
+fn append_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut value = path.as_os_str().to_os_string();
+    value.push(suffix);
+    PathBuf::from(value)
 }
 
 fn sync_directory(path: &Path) -> Result<(), LibraryError> {
