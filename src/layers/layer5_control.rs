@@ -1,10 +1,10 @@
 //! Bounded any-time controller over a caller-owned immutable frontier.
 
-use core::fmt;
 use super::layer2_state::FrontierNodeHot;
 use super::layer3_transition::transition_batch;
 use super::layer4_optimization::avx2_available;
 use super::layer6_output::{AcquisitionDecision, OutputError, OutputInterpreter};
+use core::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PolicyConfig {
@@ -17,7 +17,11 @@ impl PolicyConfig {
         if !(1800..=9999).contains(&reference_year) {
             return Err(EngineError::InvalidReferenceYear(reference_year));
         }
-        Ok(Self { reference_year, policy_version, enable_simd: true })
+        Ok(Self {
+            reference_year,
+            policy_version,
+            enable_simd: true,
+        })
     }
     pub const fn with_simd(mut self, enabled: bool) -> Self {
         self.enable_simd = enabled;
@@ -47,7 +51,9 @@ impl fmt::Display for EngineError {
 }
 impl std::error::Error for EngineError {}
 impl From<OutputError> for EngineError {
-    fn from(error: OutputError) -> Self { Self::Output(error) }
+    fn from(error: OutputError) -> Self {
+        Self::Output(error)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,13 +68,23 @@ pub struct EngineCursor {
 impl EngineCursor {
     fn new(total_candidates: usize, policy_version: u32) -> Self {
         Self {
-            next_index: 0, total_candidates, policy_version, candidates_evaluated: 0,
-            complete: total_candidates == 0, best: None,
+            next_index: 0,
+            total_candidates,
+            policy_version,
+            candidates_evaluated: 0,
+            complete: total_candidates == 0,
+            best: None,
         }
     }
-    pub const fn is_complete(&self) -> bool { self.complete }
-    pub const fn best(&self) -> Option<AcquisitionDecision> { self.best }
-    pub const fn candidates_evaluated(&self) -> u64 { self.candidates_evaluated }
+    pub const fn is_complete(&self) -> bool {
+        self.complete
+    }
+    pub const fn best(&self) -> Option<AcquisitionDecision> {
+        self.best
+    }
+    pub const fn candidates_evaluated(&self) -> u64 {
+        self.candidates_evaluated
+    }
 }
 
 /// Pure policy engine: no I/O resources, clock, or scheduler are embedded in this type.
@@ -82,10 +98,17 @@ impl AcquisitionEngine {
         if !(1800..=9999).contains(&config.reference_year) {
             return Err(EngineError::InvalidReferenceYear(config.reference_year));
         }
-        Ok(Self { config, use_simd: config.enable_simd && avx2_available() })
+        Ok(Self {
+            config,
+            use_simd: config.enable_simd && avx2_available(),
+        })
     }
-    pub const fn config(&self) -> PolicyConfig { self.config }
-    pub const fn simd_enabled(&self) -> bool { self.use_simd }
+    pub const fn config(&self) -> PolicyConfig {
+        self.config
+    }
+    pub const fn simd_enabled(&self) -> bool {
+        self.use_simd
+    }
     pub fn begin(&self, frontier: &[FrontierNodeHot]) -> EngineCursor {
         EngineCursor::new(frontier.len(), self.config.policy_version)
     }
@@ -108,9 +131,13 @@ impl AcquisitionEngine {
             return Err(EngineError::CursorDoesNotMatchFrontier);
         }
         if !cursor.complete {
-            let stop_at = cursor.next_index.saturating_add(candidate_budget).min(frontier.len());
+            let stop_at = cursor
+                .next_index
+                .saturating_add(candidate_budget)
+                .min(frontier.len());
             while cursor.next_index < stop_at {
-                let end = cursor.next_index
+                let end = cursor
+                    .next_index
                     .saturating_add(super::layer4_optimization::SCORE_BATCH_SIZE)
                     .min(stop_at);
                 transition_batch(
@@ -148,23 +175,31 @@ impl AcquisitionEngine {
         match cursor.best() {
             None => Ok(None),
             Some(decision) => Ok(Some(OutputInterpreter::validate_projection(
-                frontier, decision, self.config.reference_year, self.config.policy_version,
+                frontier,
+                decision,
+                self.config.reference_year,
+                self.config.policy_version,
             )?)),
         }
     }
 }
 
-impl crate::engine_architecture::EngineArchitecture<
-    EngineCursor, (), Option<AcquisitionDecision>
-> for AcquisitionEngine {
+impl crate::engine_architecture::EngineArchitecture<EngineCursor, (), Option<AcquisitionDecision>>
+    for AcquisitionEngine
+{
     fn initialize_state(
-        &self, frontier: &[FrontierNodeHot], _context: &(),
+        &self,
+        frontier: &[FrontierNodeHot],
+        _context: &(),
     ) -> Result<EngineCursor, EngineError> {
         Ok(self.begin(frontier))
     }
     fn transition(
-        &self, state: &mut EngineCursor, frontier: &[FrontierNodeHot],
-        _context: &(), candidate_budget: usize,
+        &self,
+        state: &mut EngineCursor,
+        frontier: &[FrontierNodeHot],
+        _context: &(),
+        candidate_budget: usize,
     ) -> Result<(), EngineError> {
         self.step(frontier, state, candidate_budget)?;
         Ok(())
@@ -173,12 +208,18 @@ impl crate::engine_architecture::EngineArchitecture<
         state.is_complete()
     }
     fn project_result(
-        &self, state: &EngineCursor, frontier: &[FrontierNodeHot], _context: &(),
+        &self,
+        state: &EngineCursor,
+        frontier: &[FrontierNodeHot],
+        _context: &(),
     ) -> Result<Option<AcquisitionDecision>, EngineError> {
         match state.best() {
             None => Ok(None),
             Some(decision) => Ok(Some(OutputInterpreter::validate_projection(
-                frontier, decision, self.config.reference_year, self.config.policy_version,
+                frontier,
+                decision,
+                self.config.reference_year,
+                self.config.policy_version,
             )?)),
         }
     }
@@ -188,14 +229,18 @@ impl crate::engine_architecture::EngineArchitecture<
 mod tests {
     use super::*;
     use crate::layers::layer2_state::{
-        FLAG_HAS_METADATA, FLAG_RESTRICTED_BY_SOURCE, FLAG_HAS_CANDIDATE_URL,
+        FLAG_HAS_CANDIDATE_URL, FLAG_HAS_METADATA, FLAG_RESTRICTED_BY_SOURCE,
     };
     use crate::layers::layer6_output::AcquisitionAction;
 
     fn node(id: u64, citations: u32, flags: u32) -> FrontierNodeHot {
         FrontierNodeHot {
-            paper_id: id, citation_count: citations, venue_rank: 2, year: 2024,
-            flags, ..FrontierNodeHot::default()
+            paper_id: id,
+            citation_count: citations,
+            venue_rank: 2,
+            year: 2024,
+            flags,
+            ..FrontierNodeHot::default()
         }
     }
     fn engine() -> AcquisitionEngine {
@@ -211,7 +256,9 @@ mod tests {
         let first = eng.step(&frontier, &mut cursor, 16).unwrap();
         assert!(!first.complete);
         assert_eq!(first.candidates_evaluated, 16);
-        while !cursor.is_complete() { eng.step(&frontier, &mut cursor, 16).unwrap(); }
+        while !cursor.is_complete() {
+            eng.step(&frontier, &mut cursor, 16).unwrap();
+        }
         assert_eq!(cursor.best().unwrap().id.paper_id, 34);
         assert_eq!(cursor.candidates_evaluated(), 40);
     }
@@ -222,7 +269,15 @@ mod tests {
             node(1, 1_000, FLAG_HAS_METADATA),
             node(2, 100_000, FLAG_HAS_METADATA | FLAG_RESTRICTED_BY_SOURCE),
         ];
-        assert_eq!(engine().run_to_completion(&frontier, 16).unwrap().unwrap().id.paper_id, 1);
+        assert_eq!(
+            engine()
+                .run_to_completion(&frontier, 16)
+                .unwrap()
+                .unwrap()
+                .id
+                .paper_id,
+            1
+        );
     }
 
     #[test]
@@ -242,8 +297,14 @@ mod tests {
         let frontier = [node(1, 1, FLAG_HAS_METADATA)];
         let eng = engine();
         let mut cursor = eng.begin(&frontier);
-        assert_eq!(eng.step(&frontier, &mut cursor, 0), Err(EngineError::CandidateBudgetMustBePositive));
+        assert_eq!(
+            eng.step(&frontier, &mut cursor, 0),
+            Err(EngineError::CandidateBudgetMustBePositive)
+        );
         let other = AcquisitionEngine::new(PolicyConfig::new(2026, 2).unwrap()).unwrap();
-        assert_eq!(other.step(&frontier, &mut cursor, 1), Err(EngineError::CursorDoesNotMatchFrontier));
+        assert_eq!(
+            other.step(&frontier, &mut cursor, 1),
+            Err(EngineError::CursorDoesNotMatchFrontier)
+        );
     }
 }
