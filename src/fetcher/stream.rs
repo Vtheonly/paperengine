@@ -69,9 +69,13 @@ pub enum DownloadError {
     Timeout,
     #[error("response exceeds the configured maximum of {limit} bytes")]
     TooLarge { limit: u64 },
-    #[error("response is smaller than the configured minimum of {minimum} bytes (received {size})")]
+    #[error(
+        "response is smaller than the configured minimum of {minimum} bytes (received {size})"
+    )]
     TooSmall { size: u64, minimum: u64 },
-    #[error("payload from {url} has no PDF signature in its first 1,024 bytes (prefix: {prefix:?})")]
+    #[error(
+        "payload from {url} has no PDF signature in its first 1,024 bytes (prefix: {prefix:?})"
+    )]
     InvalidSignature { url: String, prefix: Vec<u8> },
     #[error("invalid download response: {0}")]
     Protocol(String),
@@ -598,9 +602,8 @@ where
                     signature_probe.extend_from_slice(&chunk[..probe_bytes]);
                     pending_new_bytes.extend_from_slice(&chunk);
 
-                    signature_verified = signature_probe
-                        .windows(5)
-                        .any(|window| window == b"%PDF-");
+                    signature_verified =
+                        signature_probe.windows(5).any(|window| window == b"%PDF-");
 
                     if !signature_verified && signature_probe.len() >= 1024 {
                         return Err(DownloadError::InvalidSignature {
@@ -819,9 +822,10 @@ mod tests {
 
     #[tokio::test]
     async fn accepts_a_complete_206_range_response() {
-        let (url, server) = start_server(vec![WireResponse::new("206 Partial Content", b"%PDF-data")
-            .header("Content-Range", "bytes 0-8/9")
-            .header("ETag", "\"v1\"")]);
+        let (url, server) =
+            start_server(vec![WireResponse::new("206 Partial Content", b"%PDF-data")
+                .header("Content-Range", "bytes 0-8/9")
+                .header("ETag", "\"v1\"")]);
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("paper.pdf");
         let result = ResumableDownloader::new(test_config(100))
@@ -834,8 +838,14 @@ mod tests {
         assert_eq!(result.bytes, 9);
         assert_eq!(result.resumed_from, 0);
         assert_eq!(std::fs::read(destination).unwrap(), b"%PDF-data");
-        assert_eq!(result.blake3_hex, blake3::hash(b"%PDF-data").to_hex().to_string());
-        assert_eq!(result.sha256_hex, format!("{:x}", Sha256::digest(b"%PDF-data")));
+        assert_eq!(
+            result.blake3_hex,
+            blake3::hash(b"%PDF-data").to_hex().to_string()
+        );
+        assert_eq!(
+            result.sha256_hex,
+            format!("{:x}", Sha256::digest(b"%PDF-data"))
+        );
     }
 
     #[tokio::test]
@@ -859,7 +869,10 @@ mod tests {
         server.join().unwrap();
 
         assert_eq!(std::fs::read(destination).unwrap(), payload);
-        assert_eq!(result.blake3_hex, blake3::hash(&payload).to_hex().to_string());
+        assert_eq!(
+            result.blake3_hex,
+            blake3::hash(&payload).to_hex().to_string()
+        );
         assert_eq!(result.sha256_hex, format!("{:x}", Sha256::digest(&payload)));
     }
 
@@ -877,7 +890,10 @@ mod tests {
             .await;
         server.join().unwrap();
 
-        assert!(matches!(result, Err(DownloadError::InvalidSignature { .. })));
+        assert!(matches!(
+            result,
+            Err(DownloadError::InvalidSignature { .. })
+        ));
         assert!(!destination.exists());
         assert!(!append_suffix(&destination, ".part").exists());
         assert!(!append_suffix(&destination, ".part.meta").exists());
@@ -922,8 +938,14 @@ mod tests {
 
         assert_eq!(result.resumed_from, 5);
         assert_eq!(std::fs::read(destination).unwrap(), b"%PDF-world");
-        assert_eq!(result.blake3_hex, blake3::hash(b"%PDF-world").to_hex().to_string());
-        assert_eq!(result.sha256_hex, format!("{:x}", Sha256::digest(b"%PDF-world")));
+        assert_eq!(
+            result.blake3_hex,
+            blake3::hash(b"%PDF-world").to_hex().to_string()
+        );
+        assert_eq!(
+            result.sha256_hex,
+            format!("{:x}", Sha256::digest(b"%PDF-world"))
+        );
         assert!(requests[1].to_ascii_lowercase().contains("range: bytes=5-"));
         assert!(requests[1]
             .to_ascii_lowercase()
@@ -1030,7 +1052,8 @@ mod tests {
 
     #[tokio::test]
     async fn propagates_disk_full_write_errors_for_recovery() {
-        let (url, server) = start_server(vec![WireResponse::new("200 OK", b"%PDF-disk-space-test")]);
+        let (url, server) =
+            start_server(vec![WireResponse::new("200 OK", b"%PDF-disk-space-test")]);
         let response = Client::new().get(url).send().await.unwrap();
         let mut output = NoSpaceWriter;
         let result = pump_response_body(
