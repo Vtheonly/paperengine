@@ -199,7 +199,7 @@ impl EngineOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::concurrency::ring::{EngineRingBuffer, EVENT_FLAG_FINAL};
+    use crate::concurrency::ring::{EngineRingBuffer, TaskEnvelope, EVENT_FLAG_FINAL};
     use crate::layers::layer2_state::{FLAG_HAS_METADATA, FLAG_RESTRICTED_BY_SOURCE};
     use crate::layers::layer5_control::PolicyConfig;
 
@@ -225,6 +225,28 @@ mod tests {
         let mut ring = EngineRingBuffer::<2>::new();
         let (mut producer, mut consumer) = ring.split();
         let mut observed_final = false;
+
+        // Saturate the ring before dispatch. The orchestrator must retain the decision
+        // instead of spinning or dropping it while capacity is unavailable.
+        producer
+            .try_enqueue(TaskEnvelope {
+                paper_id: 900,
+                ..TaskEnvelope::default()
+            })
+            .unwrap();
+        producer
+            .try_enqueue(TaskEnvelope {
+                paper_id: 901,
+                ..TaskEnvelope::default()
+            })
+            .unwrap();
+        let blocked = loop_engine
+            .run_turn(&engine, &frontier, &mut cursor, &mut producer)
+            .unwrap();
+        assert!(blocked.backpressured);
+        assert!(!cursor.is_complete());
+        assert_eq!(consumer.try_dequeue().unwrap().paper_id, 900);
+        assert_eq!(consumer.try_dequeue().unwrap().paper_id, 901);
 
         for _ in 0..20 {
             let progress = loop_engine
