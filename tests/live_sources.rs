@@ -539,7 +539,15 @@ async fn live_openalex_discovery_or_blocked_by_free_tier_budget() {
         .discover(
             &DiscoveryQuery {
                 text: "open access".into(),
-                page_size: 2,
+                // Post-filter page semantics: the adapter fetches `per-page` raw
+                // results and removes non-paper types, so a tiny page can come back
+                // empty even when the source has matches. Observed live on a GitHub
+                // runner (fresh IP, budget available, run 39242803787): with
+                // page_size=2 both raw hits were non-paper types and the happy-path
+                // assertion was unreachable. Use the documented default page size
+                // (25, max 200) so an all-filtered page is not a plausible outcome
+                // while the strict non-empty assertion stays meaningful.
+                page_size: 25,
             },
             None,
         )
