@@ -1,11 +1,11 @@
 //! Last-chance validation before an in-memory decision reaches an outer adapter.
 
-use core::fmt;
 use super::layer2_state::{
     FrontierNodeHot, FLAG_AUTHORIZED_FULL_TEXT, FLAG_HAS_CANDIDATE_URL, FLAG_HAS_METADATA,
     FLAG_PDF_SIGNATURE_VERIFIED, FLAG_RESTRICTED_BY_SOURCE,
 };
 use super::layer4_optimization::score_candidates_batch;
+use core::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AcquisitionAction {
@@ -49,9 +49,7 @@ impl std::error::Error for OutputError {}
 pub(crate) fn action_for_candidate(node: &FrontierNodeHot) -> AcquisitionAction {
     if !node.has_flag(FLAG_HAS_METADATA) {
         AcquisitionAction::EnrichMetadata
-    } else if !node.has_flag(FLAG_HAS_CANDIDATE_URL)
-        || !node.has_flag(FLAG_AUTHORIZED_FULL_TEXT)
-    {
+    } else if !node.has_flag(FLAG_HAS_CANDIDATE_URL) || !node.has_flag(FLAG_AUTHORIZED_FULL_TEXT) {
         AcquisitionAction::ResolveCandidateRoute
     } else if !node.has_flag(FLAG_PDF_SIGNATURE_VERIFIED) {
         AcquisitionAction::ValidateAuthorizedCandidate
@@ -69,7 +67,8 @@ impl OutputInterpreter {
         reference_year: u16,
         policy_version: u32,
     ) -> Result<AcquisitionDecision, OutputError> {
-        let node = frontier.get(decision.candidate_index)
+        let node = frontier
+            .get(decision.candidate_index)
             .ok_or(OutputError::CandidateIndexOutOfBounds)?;
         if node.paper_id != decision.id.paper_id {
             return Err(OutputError::CandidateIdentityMismatch);
@@ -84,7 +83,9 @@ impl OutputInterpreter {
             return Err(OutputError::ActionInvariantViolation);
         }
         let score = score_candidates_batch(core::slice::from_ref(node), reference_year, false)[0];
-        if score != decision.score { return Err(OutputError::ScoreMismatch); }
+        if score != decision.score {
+            return Err(OutputError::ScoreMismatch);
+        }
         Ok(decision)
     }
 }
@@ -101,13 +102,21 @@ mod tests {
     fn restricted_candidate_rejected_at_output_boundary() {
         let node = FrontierNodeHot {
             paper_id: 7,
-            flags: FLAG_HAS_METADATA | FLAG_HAS_CANDIDATE_URL | FLAG_AUTHORIZED_FULL_TEXT
-                | FLAG_PDF_SIGNATURE_VERIFIED | FLAG_RESTRICTED_BY_SOURCE,
+            flags: FLAG_HAS_METADATA
+                | FLAG_HAS_CANDIDATE_URL
+                | FLAG_AUTHORIZED_FULL_TEXT
+                | FLAG_PDF_SIGNATURE_VERIFIED
+                | FLAG_RESTRICTED_BY_SOURCE,
             ..FrontierNodeHot::default()
         };
         let decision = AcquisitionDecision {
-            id: DecisionId { paper_id: 7, policy_version: 1 }, candidate_index: 0,
-            score: 0, action: AcquisitionAction::AcquireVerifiedAuthorizedPayload,
+            id: DecisionId {
+                paper_id: 7,
+                policy_version: 1,
+            },
+            candidate_index: 0,
+            score: 0,
+            action: AcquisitionAction::AcquireVerifiedAuthorizedPayload,
         };
         assert_eq!(
             OutputInterpreter::validate_projection(&[node], decision, 2026, 1),
@@ -124,8 +133,13 @@ mod tests {
         };
         let score = score_candidates_batch(core::slice::from_ref(&node), 2026, false)[0];
         let decision = AcquisitionDecision {
-            id: DecisionId { paper_id: 7, policy_version: 2 }, candidate_index: 0,
-            score, action: AcquisitionAction::AcquireVerifiedAuthorizedPayload,
+            id: DecisionId {
+                paper_id: 7,
+                policy_version: 2,
+            },
+            candidate_index: 0,
+            score,
+            action: AcquisitionAction::AcquireVerifiedAuthorizedPayload,
         };
         assert_eq!(
             OutputInterpreter::validate_projection(&[node], decision, 2026, 2),
