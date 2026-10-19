@@ -98,7 +98,17 @@ if ! acquire_once; then
       --refetch
 fi
 
-echo "== [cell 7] inspect library and report =="
+echo "== [cell 7] extract text, index, and search the library =="
+./target/release/paperengine extract --library ./research-library
+./target/release/paperengine index --library ./research-library
+./target/release/paperengine search --library ./research-library \
+    --query "attention" --limit 5
+# A body-text-only query proves the full-text path end to end (the phrase appears in
+# extracted body text, not in titles or authors).
+./target/release/paperengine search --library ./research-library \
+    --query "stateless eager schema injection" --limit 5 || true
+
+echo "== [cell 8] inspect library and report =="
 ./target/release/paperengine inspect --library ./research-library
 latest_report=$(ls -1t research-library/reports/*.jsonl | head -n 1)
 echo "latest report: $latest_report"

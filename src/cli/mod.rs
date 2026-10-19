@@ -10,9 +10,11 @@ use std::error::Error;
 pub mod acquire;
 pub mod discover;
 pub mod extract;
+pub mod index;
 pub mod inspect;
 pub mod lookup;
 pub mod rank;
+pub mod search;
 pub mod selftest;
 
 /// Parsed command-line flags: `--key value` pairs plus boolean switches.
@@ -95,10 +97,12 @@ pub fn dispatch(command: &str, args: impl Iterator<Item = String>) -> Result<(),
         "lookup" => lookup::run(args),
         "acquire" => acquire::run(args),
         "extract" => extract::run(args),
+        "index" => index::run(args),
+        "search" => search::run(args),
         "inspect" => inspect::run(args),
         "self-test" => selftest::run(args),
         other => Err(format!(
-            "unknown command `{other}`; expected one of: rank, discover, lookup, acquire, extract, inspect, self-test"
+            "unknown command `{other}`; expected one of: rank, discover, lookup, acquire, extract, index, search, inspect, self-test"
         )
         .into()),
     }
@@ -115,6 +119,8 @@ commands:
   lookup     resolve a single DOI through a source adapter (no downloads)
   acquire    download permitted OA PDFs from a discovery file into a local library
   extract    extract text and metadata from a library's objects (offline)
+  index      build or update the library's local search index (offline)
+  search     query the local index over titles, authors, and extracted text (offline)
   inspect    list the contents of a local library
   self-test  print each adapter's offline capability report
 

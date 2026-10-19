@@ -51,10 +51,18 @@ Next steps (all local, no cloud account required):
   ./target/release/paperengine acquire --from discovery.jsonl \
       --library ./research-library --max-downloads 2
 
-  # 4. Inspect the resulting library
+  # 4. Extract text and metadata from the acquired objects (offline)
+  ./target/release/paperengine extract --library ./research-library
+
+  # 5. Build the local search index and search it (offline)
+  ./target/release/paperengine index  --library ./research-library
+  ./target/release/paperengine search --library ./research-library \
+      --query "attention" --limit 5
+
+  # 6. Inspect the resulting library
   ./target/release/paperengine inspect --library ./research-library
 
-  # 5. Optional: bounded live tests against real sources (small request budget)
+  # 7. Optional: bounded live tests against real sources (small request budget)
   PAPERENGINE_LIVE_TESTS=1 cargo test --test live_sources -- --ignored --nocapture --test-threads=1
 
 Offline fixture tests never touch the network. Live tests are opt-in and rate-limited.

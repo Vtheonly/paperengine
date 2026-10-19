@@ -11,6 +11,7 @@
 //!   tmp/                                  scratch for in-flight transfers (never durable)
 //!   extracted/<sha[0..2]>/<sha>.txt       extracted text artifacts (#31, src/extract.rs)
 //!   extraction/<sha>.json                 extraction provenance records (#31)
+//!   index/                                derived Tantivy index (#32, src/index.rs)
 //! ```
 //!
 //! A download is reported as acquired only after the payload passed structural PDF
@@ -208,6 +209,11 @@ impl LibraryLayout {
     /// Durable acquisition job records (#6): one atomically-published JSON per job.
     pub fn jobs_dir(&self) -> PathBuf {
         self.root.join("jobs")
+    }
+
+    /// Tantivy index directory (derived state; delete or `--rebuild` to recreate).
+    pub fn index_dir(&self) -> PathBuf {
+        self.root.join("index")
     }
 
     /// Create the directory skeleton. Idempotent.

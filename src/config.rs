@@ -6,6 +6,7 @@
 //! come from `PAPERENGINE_CONTACT_EMAIL`.
 
 use crate::extract::ExtractionConfig;
+use crate::index::IndexingConfig;
 use crate::library::AcquisitionConfig;
 use crate::sources::BuiltinSourcesConfig;
 use serde::Deserialize;
@@ -41,6 +42,8 @@ pub struct PaperEngineConfig {
     pub acquisition: AcquisitionSettings,
     #[serde(default)]
     pub extraction: ExtractionSettings,
+    #[serde(default)]
+    pub indexing: IndexingSettings,
 }
 
 impl Default for PaperEngineConfig {
@@ -52,6 +55,7 @@ impl Default for PaperEngineConfig {
             discovery: DiscoverySettings::default(),
             acquisition: AcquisitionSettings::default(),
             extraction: ExtractionSettings::default(),
+            indexing: IndexingSettings::default(),
         }
     }
 }
@@ -125,6 +129,22 @@ impl Default for ExtractionSettings {
         Self {
             max_text_bytes: 16 * 1024 * 1024,
             max_objects: 256,
+        }
+    }
+}
+
+/// Budgets for the indexing stage (#32).
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct IndexingSettings {
+    /// Tantivy writer memory budget in bytes.
+    pub memory_budget_bytes: usize,
+}
+
+impl Default for IndexingSettings {
+    fn default() -> Self {
+        Self {
+            memory_budget_bytes: 32 * 1024 * 1024,
         }
     }
 }
@@ -218,6 +238,13 @@ impl PaperEngineConfig {
                 "extraction.max_objects must be between 1 and 100000".into(),
             ));
         }
+        let i = &self.indexing;
+        if i.memory_budget_bytes < 15_000_000 || i.memory_budget_bytes > 2 * 1024 * 1024 * 1024 {
+            return Err(ConfigError::Invalid(
+                "indexing.memory_budget_bytes must be between 15 MB (Tantivy arena floor) and 2 GiB"
+                    .into(),
+            ));
+        }
         Ok(())
     }
 
@@ -266,6 +293,12 @@ impl PaperEngineConfig {
             max_attempts: self.acquisition.job_max_attempts,
             retry_min_delay_seconds: self.acquisition.job_retry_min_delay_seconds,
             refetch,
+        }
+    }
+
+    pub fn indexing_config(&self) -> IndexingConfig {
+        IndexingConfig {
+            memory_budget_bytes: self.indexing.memory_budget_bytes,
         }
     }
 }

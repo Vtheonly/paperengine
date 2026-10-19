@@ -611,3 +611,82 @@ reports all four OAI-PMH adapters; search sources still require `--query`.
   search remains 429-blocked on the shared free-tier budget; both are recorded
   as BLOCKED, never bypassed.
 - No performance claims are made in this report; benchmarks are tracked by #36.
+
+## Fifth run — extraction, indexing, and local search (#31, #32, #33)
+
+Environment: Linux x86-64 (Debian trixie container, 2 cores), rustc 1.99.1
+(58cf8f9c3 2026-10-13), cargo 1.99.1, 2026-10-19 (UTC).
+
+### Static verification (source commit 5a39a31 for #31; #32/#33 in the follow-up commit)
+
+```
+cargo fmt --all -- --check          # pass
+cargo clippy --all-targets --all-features -- -D warnings   # pass
+cargo test --all-features           # 144+15 passed, 0 failed, 27 ignored (live, opt-in)
+                                     # includes 7 extraction + 8 indexing acceptance tests
+cargo build --release               # pass
+```
+
+### Real end-to-end extraction evidence (CLI, production pipeline) — 2026-10-19
+
+Library: the real arXiv object acquired earlier in this report
+(sha256 `f2441d3de469aa1e7c04b7e2412361cdc0b429b7ac5fbfd05196a5909bd94aeb`,
+447,412 bytes, 21 pages).
+
+```bash
+./target/release/paperengine extract --library /tmp/research-library
+```
+
+Outcome: `extracted=1 failed=0`. The extraction record
+(`extraction/f2441d3d….json`) records extractor `paperengine/lopdf-text` version 1,
+paperengine 0.1.0, 48,982 characters of text from 19 of 21 pages, 49,425 text bytes,
+text sha256 `524b42f4cac2cbbdc943a4a20cbdad03fdbe4d7d2783a25be23fecd425c88c39`,
+PDF `/Info` title "Tool Attention Is All You Need: …", author "Anuj Sadani; Deepak
+Kumar", creator "arXiv GenPDF (tex2pdf:a6404ea)", and two honest per-page notes
+("page 4/6: failed parsing ToUnicode CMap") — failures recorded, not hidden. A second
+`extract` run skipped the completed record; `--force` re-extraction produced
+byte-identical text (asserted by `tests/extraction_tests.rs`).
+
+### Real end-to-end indexing and search evidence (CLI) — 2026-10-19
+
+A second real object was acquired through Unpaywall
+(`10.1371/journal.pone.0000219`, PLOS ONE, cc-by): 703,571 bytes, 14 pages, sha256
+`4f111c22feab76f1f8b5e33474a01933f97d67cfbf56d4fbd53e7721edc22006` — byte-identical
+to the OpenAlex-acquired payload recorded earlier in this report, cross-checking both
+resolvers again.
+
+```bash
+./target/release/paperengine extract --library /tmp/research-library   # extracted=1 skipped=1
+./target/release/paperengine index  --library /tmp/research-library    # added=1 skipped=1
+./target/release/paperengine search --library /tmp/research-library --query "Arabidopsis microRNAs" --limit 5
+```
+
+Search result (human output):
+
+```text
+library: /tmp/research-library (2 indexed documents)
+ 1. [unpaywall] High-Throughput Sequencing of Arabidopsis microRNAs: Evidence for
+    Frequent Birth and Death of MIRNA Genes (2007) — Noah Fahlgren
+    sha256=4f111c22feab doi:10.1371/journal.pone.0000219 pages=14 bytes=703571 text=yes
+```
+
+A body-text-only query (`--query "stateless eager schema injection"` — words that
+appear only in the extracted body, not in any title or author) returned the arXiv
+paper as the sole hit, proving the full-text path end to end. Filter queries
+(`--source openalex` → no matches; `--source arxiv` → the arXiv paper) behaved as
+specified.
+
+Restart/rebuild parity, deletion, version separation, update-after-extraction, and
+canonical-metadata immutability under failed runs are covered by the 8 acceptance
+tests in `tests/indexing_tests.rs`; extraction determinism, idempotent skip, budget
+truncation, corrupt-object retry, and content-address verification by the 7 tests in
+`tests/extraction_tests.rs`.
+
+### Limitations (extraction/indexing slice)
+
+- lopdf's text extractor does not reconstruct layout and cannot decode every
+  custom/CID font; per-page failures are recorded as bounded notes and those pages
+  contribute no text. No OCR.
+- Image-only (scanned) PDFs yield an honest `empty` status, not fabricated text.
+- The index is derived state; a schema-incompatible index requires `--rebuild`.
+- No collection management or saved-search views yet (#33 follow-up scope).

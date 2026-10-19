@@ -32,3 +32,6 @@ job_retry_min_delay_seconds = 60      # exponential backoff floor between job at
 [extraction]
 max_text_bytes = 16777216             # extracted text persisted per object (1..=256 MiB)
 max_objects = 256                     # objects processed per extraction run (1..=100000)
+
+[indexing]
+memory_budget_bytes = 33554432        # Tantivy writer arena (15 MB..=2 GiB)

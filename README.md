@@ -28,15 +28,16 @@ Implemented now:
   metadata-only (`oai_dc`/`arXiv` formats carry no PDF links); DOAJ's OAI interface
   disseminates journal records only — recorded honestly in the registry.
 - Identifier normalization for DOI, arXiv (modern + legacy), PMID, and PMCID with equivalent-form tests.
-- A bounded, download-free **discovery runner** and a CLI: `discover`, `lookup`, `acquire`, `extract`, `inspect`, `self-test`, and `rank`.
+- A bounded, download-free **discovery runner** and a CLI: `discover`, `lookup`, `acquire`, `extract`, `index`, `search`, `inspect`, `self-test`, and `rank`.
 - **Content-addressed storage**: `objects/<sha256[0..2]>/<sha256>.pdf` published by atomic rename with directory sync, provenance manifests published atomically (pending → fsync → rename — a crash can never tear one), per-run JSONL acquisition reports, dedup, a pre-request URL policy gate (scheme, credentials, host), and `unattributed_objects` reporting so a crash between object publication and manifest write is surfaced as incomplete rather than silently counted (`paperengine inspect` shows it).
 - Offline integration tests over a local HTTP fixture server, plus opt-in bounded live tests against the real APIs — including real PDF acquisitions through the production pipeline (arXiv verified; Europe PMC acquisition is 403-blocked on datacenter networks and records BLOCKED evidence).
 - Validated configuration file (`paperengine.toml`) with unknown-key rejection and actionable budget errors.
 - **Provenance-aware extraction (#31)**: real-parser PDF text and `/Info` metadata extraction over finalized objects, with a versioned extractor identity, per-object provenance records, content-addressed text artifacts (`extracted/`), bounded budgets, deterministic re-runs, and an `extract` CLI command.
+- **Incremental indexing and local search (#32, #33)**: a Tantivy index over provenance metadata and extracted text (`index/`), incremental updates with state digests, deletes for vanished objects, version separation by content address, single-commit crash safety, and `index` + `search` CLI commands with source/DOI/arXiv/year/text filters.
 - GitHub Actions formatting, Clippy, test, and release-build checks; a separate manually-triggered live-test workflow.
 
 Still **not implemented**: CLI construction of custom OAI-PMH endpoints and cross-run
-registry ingest (remaining #13), URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, zstd text artifacts, Tantivy indexing/search, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
+registry ingest (remaining #13), URL canonicalization and cached link revalidation, policy-aware durable queues/leases/retries, multi-volume storage and integrity scrubbing, JATS/TEI extraction, zstd text artifacts, CPU affinity, Python supervision, and measured benchmark baselines. Existing GitHub issues track those as separate tasks. No issue is considered complete merely because the current kernel compiles.
 
 ## Source adapters
 
@@ -151,6 +152,27 @@ content-addressed text artifact under `extracted/`, and records provenance under
 bounded per-page notes. Completed extractions are skipped on re-run; `--force`
 re-extracts and produces byte-identical text. Failures are retried on the next run.
 A per-run report lands in `research-library/reports/`.
+
+### Index the library and search it locally
+
+```bash
+./target/release/paperengine index  --library ./research-library
+./target/release/paperengine search --library ./research-library \
+    --query "attention mechanism" --limit 5
+./target/release/paperengine search --library ./research-library \
+    --query "" --source arxiv --year-min 2024 --text-only
+```
+
+`index` incrementally builds the library's Tantivy index from provenance manifests and
+extraction records: unchanged documents are skipped via a state digest, changed ones are
+updated, objects that vanished from the library are deleted, and everything commits
+once per run — an interrupted run leaves the previous index intact and canonical
+metadata is never modified. `--rebuild` recreates the index from scratch. `search`
+queries titles, authors, venues, and the extracted full text (title-boosted) with
+optional `--source`, `--doi`, `--arxiv-id`, `--year-min/--year-max`, `--text-only`, and
+`--limit` filters; `--json` emits machine-readable results. Every hit carries the
+object's content address, identifiers, page count, and byte size, so results trace
+back to a stored, checksummed PDF.
 
 ### Recovery and the durable job ledger
 

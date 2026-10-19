@@ -6,6 +6,7 @@ pub mod config;
 pub mod engine_architecture;
 pub mod extract;
 pub mod fetcher;
+pub mod index;
 pub mod jobs;
 pub mod layers;
 pub mod library;

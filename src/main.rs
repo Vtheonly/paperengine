@@ -6,8 +6,8 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let result = match args.next().as_deref() {
         Some(
-            command @ ("rank" | "discover" | "lookup" | "acquire" | "extract" | "inspect"
-            | "self-test"),
+            command @ ("rank" | "discover" | "lookup" | "acquire" | "extract" | "index" | "search"
+            | "inspect" | "self-test"),
         ) => cli::dispatch(command, args),
         Some("--version") | Some("-V") => {
             println!("paperengine {}", env!("CARGO_PKG_VERSION"));
