@@ -194,3 +194,40 @@ Cross-checks recorded for the first time in this run:
 
 Full per-source details and last-live-result entries are maintained in
 `docs/SOURCE_COVERAGE.md`.
+
+## Third run — OAI-PMH family added (final source commit ea1e827)
+
+Command set (all executed as written on 2026-10-19):
+
+```bash
+PAPERENGINE_LIVE_TESTS=1 PAPERENGINE_LIVE_ACQUIRE=1 \
+  cargo test --test live_sources -- --ignored --nocapture   # 25 passed, 0 failed
+cargo fmt --all -- --check                                  # pass
+cargo clippy --all-targets --all-features -- -D warnings    # pass
+cargo test --all-features                                   # 134 unit + 19 integration, 0 failed
+cargo build --release                                       # pass
+```
+
+New in this run (issue #13, generic OAI-PMH 2.0 harvester):
+
+| Test | Source | Observed result |
+|---|---|---|
+| `live_zenodo_oaipmh_harvests_records_with_resumption_tokens` | zenodo-oaipmh (`https://zenodo.org/oai2d`) | 50-record window harvest (`from=2026-10-19`), paper filter 50 → 18, resumption token followed; every record carries a DOI and no PDF claim |
+| `live_doaj_oaipmh_journal_records_are_filtered_by_default` | doaj-oaipmh (`https://doaj.org/oai`) | 274 journal records from `from=2026-09-01`, **all excluded** by the default paper-only policy (containers are not papers); permissive mode parses them with landing pages |
+| `live_pmc_oaipmh_harvests_article_records_with_identifiers` | pmc-oaipmh (`https://pmc.ncbi.nlm.nih.gov/api/oai/v1/mh/`) | 10 article records from `from=2026-10-10`, each with a DOI and a PMCID extracted from the PMC article URL; resumption token followed |
+
+Protocol properties verified in this run: `noRecordsMatch` is returned as an
+empty page (not an error), a document without an OAI-PMH envelope is rejected as
+a malformed response, deleted headers are skipped, and Dublin Core never yields
+a PDF claim. The legacy PMC OAI path (`ncbi.nlm.nih.gov/pmc/oai/oai.cgi`)
+301-redirects to the modern endpoint, which the adapter uses directly.
+
+Deployment-path verification repeated at this revision:
+
+- `scripts/setup-linux.sh` — SUCCESS (toolchain check, release build, offline
+  tests, smoke `rank` run, printed next steps).
+- `scripts/colab-equivalent-run.sh` at pinned revision — SUCCESS from a clean
+  clone: build + offline verification, configuration, self-test across all
+  twelve registered sources, live arXiv discovery, Unpaywall resolution, real
+  acquisition of two PDFs (447,412 B / 21 pages and 2,215,244 B / 15 pages —
+  the original "Attention Is All You Need"), library inspection, and report.
