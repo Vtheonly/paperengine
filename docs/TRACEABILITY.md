@@ -1,31 +1,25 @@
 # Requirement Traceability
 
-This map connects project requirements to the initial phased GitHub backlog. Tests and implementation paths should be added as issues are completed.
+This map links requirements to the existing issue backlog and the current implementation evidence.
 
-| Area | Requirement | Initial issue |
-|---|---|---|
-| Scope and compliance | Freeze v1 scope, exclusions, lawful access boundaries | P0: Audit requirements and freeze v1 scope |
-| Performance | Capacity model and reproducible benchmark plan | P0: Build capacity model and benchmark plan |
-| Architecture | Explicit module boundaries and ADRs | P0: Define module boundaries and architecture decisions |
-| Configuration | Typed config, safe resource budgets, secret redaction | P0: Implement validated configuration and resource budgets |
-| Data | Work/manifestation/object/source/provenance separation | P0: Design publication and provenance schema |
-| Reliability | Durable job states and error taxonomy | P0: Specify durable job state machine |
-| Extensibility | Versioned source plugin lifecycle | P1: Define source plugin contract |
-| Metadata | Stable identifier and metadata normalization | P1: Implement normalization |
-| Discovery | Query planning and discovery-only workflow | P1: Build query planner |
-| Classification | Paper-only defaults and auditable exclusions | P1: Implement paper-only filtering |
-| Sources | Official APIs, repository adapters, OAI-PMH | P1: Source adapter issues |
-| URLs | Canonicalization and bounded redirect tracking | P2: URL canonicalization |
-| Link health | Tiered checks, status/MIME and caching | P2: Link-health validator and TTL |
-| Policy | Politeness, quotas, restriction handling | P2: Source policy enforcement |
-| Queue | Leases, heartbeats, recovery, adaptive scheduling | P3: Queue and scheduler issues |
-| Acquisition | Streaming/resume, payload validation | P4: Downloader and PDF validation |
-| Storage | Content addressing, atomic finalize, volume safety | P4: Storage issues |
-| Extraction | Provenance-aware text and metadata extraction | P5: Extraction |
-| Search | Incremental full-text and metadata index | P5: Indexing and CLI search |
-| Operations | Structured logs, metrics, health checks | P6: Diagnostics |
-| Quality | Fault injection, integration tests, benchmark gates | P6: Hardening |
-| Optional extensions | Bulk ingestion, external storage, multi-worker, HTTP search | P7: Reviewed extension issues |
+| Area | Implementation / Issue |
+|---|---|
+| Scope, lawful access, paper-only defaults | docs/REQUIREMENTS.md; issue #1 |
+| Capacity model and benchmark plan | issue #2; no performance claim accepted without measurements |
+| Architecture boundaries and ADRs | docs/ENGINE_CORE_ARCHITECTURE.md; docs/adr/0001-pure-computational-kernel.md; issue #3 |
+| Validated config and resource budgets | issue #4; not yet complete |
+| Publication, manifestation, object, source, candidate URL, job, provenance schema | issue #5; not yet complete |
+| Durable job states and retry taxonomy | issue #6; not yet complete |
+| Isolated acquisition strategy kernel and bounded event dispatch | issue #42; src/engine_architecture.rs; src/layers/layer1_input.rs through layer6_output.rs; src/concurrency/ring.rs; src/runtime/orchestrator.rs; src/main.rs |
+| Versioned source plugin contract and provider adapters | issues #7, #11, #12, #13; not yet complete |
+| Metadata normalization, query planner, paper-only classifier | issues #8, #9, #10; kernel input normalization is only the primitive boundary |
+| URL canonicalization, validation, policy and TTL | issues #14 through #23; not yet complete |
+| Durable queue, leases, retries, backpressure scheduler | issues #24 through #26; current SPSC ring is volatile and is not a durable job queue |
+| Streaming fetch, PDF validation, content-addressed storage and volume safety | issues #27 through #30; not yet complete |
+| Extraction, incremental index, CLI search | issues #31 through #33; not yet complete beyond the current candidate-ranking CLI |
+| Logs, metrics, fault injection and benchmarks | issues #34 through #36; workflow checks are configured, but results must be verified and benchmark baselines are still absent |
+| Bulk ingestion, external storage, multi-worker coordination, optional read-only search | issues #37 through #41; deferred |
 
 ## Completion rule
-An issue is complete only when acceptance criteria are tested, relevant invariants remain true, diagnostics explain failure modes, and documentation reflects actual behavior. Do not mark a feature complete based solely on compilation or a happy-path demo.
+
+An issue is complete only after its acceptance criteria and relevant failure paths are verified, the CI checks pass, and the documentation reflects actual behavior. The kernel slice does not establish end-to-end production readiness or performance.
