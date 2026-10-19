@@ -175,7 +175,7 @@ mod tests {
         let mut ring = EngineRingBuffer::<256>::new();
         let (mut producer, mut consumer) = ring.split();
         std::thread::scope(|scope| {
-            scope.spawn(move || {
+            let producer_thread = scope.spawn(move || {
                 for id in 1..=COUNT {
                     let mut pending = event(id);
                     loop {
@@ -189,7 +189,7 @@ mod tests {
                     }
                 }
             });
-            scope.spawn(move || {
+            let consumer_thread = scope.spawn(move || {
                 for expected in 1..=COUNT {
                     loop {
                         if let Some(item) = consumer.try_dequeue() {
@@ -200,6 +200,8 @@ mod tests {
                     }
                 }
             });
+            producer_thread.join().expect("producer thread failed");
+            consumer_thread.join().expect("consumer thread failed");
         });
     }
 }
